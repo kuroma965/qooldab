@@ -7,65 +7,85 @@ export default function LoginForm({ redirectTo = '/account' }) {
   const router = useRouter();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loadingSignin, setLoadingSignin] = useState(false);
+  const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [error, setError] = useState('');
+
+  // simple email validator
+  function validateEmail(e) {
+    return /\S+@\S+\.\S+/.test(e);
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError('');
-    setLoading(true);
+
+    const cleanedEmail = String(email || '').trim().toLowerCase();
+    if (!validateEmail(cleanedEmail)) {
+      setError('อีเมลไม่ถูกต้อง');
+      return;
+    }
+    if (!password) {
+      setError('กรุณากรอกรหัสผ่าน');
+      return;
+    }
+
+    setLoadingSignin(true);
+
     try {
-      // พยายามใช้ next-auth ถ้ามี
+      // dynamic import so bundle size is smaller and SSR safe
       const nextAuth = await import('next-auth/react').catch(() => null);
 
-      if (nextAuth && typeof nextAuth.signIn === 'function') {
-        const res = await nextAuth.signIn('credentials', {
-          redirect: false,
-          email,
-          password,
-        });
-        if (res?.error) {
-          setError(res.error || 'เข้าสู่ระบบไม่สำเร็จ');
-        } else {
-          router.push(redirectTo);
-        }
+      if (!nextAuth || typeof nextAuth.signIn !== 'function') {
+        setError('Auth client ไม่พร้อมใช้งาน — ตรวจสอบการติดตั้ง next-auth');
+        return;
+      }
+
+      // Use redirect: false to receive result object and show errors
+      const res = await nextAuth.signIn('credentials', {
+        redirect: false,
+        email: cleanedEmail,
+        password,
+      });
+
+      // In dev you can inspect res in console if needed:
+      // console.log('signIn res:', res);
+
+      if (res?.error) {
+        // NextAuth returns error message from authorize() when redirect: false
+        setError(res.error || 'เข้าสู่ระบบไม่สำเร็จ');
       } else {
-        // fallback: เรียก API ของคุณเอง
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        if (res.ok) router.push(redirectTo);
-        else {
-          const data = await res.json().catch(() => ({}));
-          setError(data?.message || 'เข้าสู่ระบบไม่สำเร็จ');
-        }
+        // success: NextAuth sets cookie; redirect to protected page
+        router.push(redirectTo);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Login error:', err);
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่');
     } finally {
-      setLoading(false);
+      setLoadingSignin(false);
     }
   }
 
   async function handleGoogleSignIn() {
     setError('');
-    setLoading(true);
+    setLoadingGoogle(true);
+
     try {
       const nextAuth = await import('next-auth/react').catch(() => null);
-      if (nextAuth && typeof nextAuth.signIn === 'function') {
-        // NextAuth: เปิดหน้าล็อกอินของ Google
-        await nextAuth.signIn('google', { callbackUrl: redirectTo });
-      } else {
+      if (!nextAuth || typeof nextAuth.signIn !== 'function') {
         setError('Social login ยังไม่ถูกตั้งค่าในโปรเจกต์นี้');
+        setLoadingGoogle(false);
+        return;
       }
+
+      // This redirects browser to Google. callbackUrl will bring user back.
+      await nextAuth.signIn('google', { callbackUrl: redirectTo });
+
+      // usually redirect happens and code below won't run
     } catch (err) {
-      console.error(err);
+      console.error('Google sign-in error:', err);
       setError('เข้าสู่ระบบด้วย Google เกิดข้อผิดพลาด');
-    } finally {
-      setLoading(false);
+      setLoadingGoogle(false);
     }
   }
 
@@ -80,12 +100,12 @@ export default function LoginForm({ redirectTo = '/account' }) {
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-2 bg-red-600/20 border border-red-600 text-red-200 rounded">
+        <div className="mb-4 px-4 py-2 bg-red-600/20 border border-red-600 text-red-200 rounded" role="alert">
           {error}
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-4" aria-disabled={loadingSignin || loadingGoogle}>
         <label className="block">
           <span className="text-sm text-gray-300">อีเมล</span>
           <input
@@ -95,6 +115,8 @@ export default function LoginForm({ redirectTo = '/account' }) {
             onChange={(e) => setEmail(e.target.value)}
             className="mt-1 block w-full rounded-lg bg-gray-900 border border-gray-700 text-white px-3 py-2 placeholder-gray-500 focus:ring-2 focus:ring-purple-600 outline-none"
             placeholder="you@example.com"
+            disabled={loadingSignin || loadingGoogle}
+            aria-invalid={!validateEmail(email)}
           />
         </label>
 
@@ -107,6 +129,7 @@ export default function LoginForm({ redirectTo = '/account' }) {
             onChange={(e) => setPassword(e.target.value)}
             className="mt-1 block w-full rounded-lg bg-gray-900 border border-gray-700 text-white px-3 py-2 placeholder-gray-500 focus:ring-2 focus:ring-purple-600 outline-none"
             placeholder="••••••••"
+            disabled={loadingSignin || loadingGoogle}
           />
         </label>
 
@@ -114,10 +137,21 @@ export default function LoginForm({ redirectTo = '/account' }) {
           <Link href="/login/forgot" className="text-sm text-gray-400 hover:text-white">ลืมรหัสผ่าน?</Link>
           <button
             type="submit"
-            disabled={loading}
-            className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg shadow"
+            disabled={loadingSignin || loadingGoogle}
+            className={`inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-4 py-2 rounded-lg shadow ${loadingSignin ? 'opacity-80 cursor-wait' : ''}`}
+            aria-busy={loadingSignin}
           >
-            {loading ? 'กำลังเข้า...' : 'เข้าสู่ระบบ'}
+            {loadingSignin ? (
+              <>
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden>
+                  <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" strokeOpacity="0.25" fill="none" />
+                  <path d="M22 12a10 10 0 0 1-10 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                <span>กำลังเข้า...</span>
+              </>
+            ) : (
+              'เข้าสู่ระบบ'
+            )}
           </button>
         </div>
       </form>
@@ -134,12 +168,26 @@ export default function LoginForm({ redirectTo = '/account' }) {
       <div className="space-y-3">
         <button
           onClick={handleGoogleSignIn}
-          className="w-full flex items-center justify-center gap-3 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 hover:bg-gray-800 transition"
+          disabled={loadingGoogle || loadingSignin}
+          className={`w-full flex items-center justify-center gap-3 border border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-100 hover:bg-gray-800 transition ${loadingGoogle ? 'opacity-80 cursor-wait' : ''}`}
+          aria-busy={loadingGoogle}
         >
-          <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
-            <path fill="#EA4335" d="M12 11.5v2.8h4.1c-.2 1.2-1 3.2-4.1 3.2-2.5 0-4.6-2-4.6-4.6S9.5 8.5 12 8.5c1.4 0 2.3.6 2.8 1l1.9-1.8C15.5 6 13.9 5.2 12 5.2 7.6 5.2 4 8.8 4 13.2S7.6 21.2 12 21.2c5 0 8.2-3.6 8.2-8.7 0-.6-.1-1.1-.2-1.6H12z"/>
-          </svg>
-          {loading ? 'กำลัง...' : 'เข้าสู่ระบบด้วย Google'}
+          {loadingGoogle ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" aria-hidden>
+                <circle cx="12" cy="12" r="10" stroke="white" strokeWidth="2" strokeOpacity="0.25" fill="none" />
+                <path d="M22 12a10 10 0 0 1-10 10" stroke="white" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <span>กำลังเชื่อมต่อ...</span>
+            </>
+          ) : (
+            <>
+              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
+                <path fill="#EA4335" d="M12 11.5v2.8h4.1c-.2 1.2-1 3.2-4.1 3.2-2.5 0-4.6-2-4.6-4.6S9.5 8.5 12 8.5c1.4 0 2.3.6 2.8 1l1.9-1.8C15.5 6 13.9 5.2 12 5.2 7.6 5.2 4 8.8 4 13.2S7.6 21.2 12 21.2c5 0 8.2-3.6 8.2-8.7 0-.6-.1-1.1-.2-1.6H12z"/>
+              </svg>
+              <span>เข้าสู่ระบบด้วย Google</span>
+            </>
+          )}
         </button>
       </div>
 
