@@ -61,10 +61,10 @@ export default function GameShop({ initialQuery = '' }) {
 
             // ในกรณีจริง คุณจะเรียก API endpoint ที่เกี่ยวข้องกับเกม
             // const res = await fetch(`/api/games?${params.toString()}`, { cache: 'no-store' });
-            
+
             // สำหรับตัวอย่างนี้ เราจะจำลองข้อมูลเกม
             await new Promise(resolve => setTimeout(resolve, 800));
-            
+
             const mockGames = [
                 {
                     id: 1,
@@ -211,7 +211,7 @@ export default function GameShop({ initialQuery = '' }) {
                     discount: 0
                 }
             ];
-            
+
             // สุ่มข้อมูลเพื่อจำลองการแบ่งหน้า
             const startIndex = (pageNum - 1) * itemsPerPage;
             const endIndex = startIndex + itemsPerPage;
@@ -294,7 +294,7 @@ export default function GameShop({ initialQuery = '' }) {
     const GameCard = ({ game }) => {
         const [imgSrc, setImgSrc] = useState(game.image);
         const [imgError, setImgError] = useState(false);
-        
+
         const handleImageError = () => {
             if (!imgError) {
                 setImgError(true);
@@ -308,11 +308,11 @@ export default function GameShop({ initialQuery = '' }) {
                     "Party": "https://images.unsplash.com/photo-1601828688063-932a274f7a5c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
                     "Strategy": "https://images.unsplash.com/photo-1511512578047-d6360b94f7fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80"
                 };
-                
+
                 setImgSrc(fallbackImages[game.category] || "https://images.unsplash.com/photo-1511512578047-d6360b94f7fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80");
             }
         };
-        
+
         return (
             <div className="bg-gray-900 rounded-2xl shadow-lg overflow-hidden border border-purple-800 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1">
                 <div className="relative h-48 w-full">
@@ -326,16 +326,28 @@ export default function GameShop({ initialQuery = '' }) {
                         unoptimized={true}
                     />
                     {game.discount > 0 && (
-                        <div className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm">
-                            -{game.discount}%
+                        <div className="absolute top-3 left-3 bg-green-600 text-white text-xs font-bold px-2 py-1 rounded-md shadow-sm">
+                            ใหม่
                         </div>
                     )}
                     {game.isPopular && (
-                        <div className="absolute top-3 right-3 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-md shadow-sm flex items-center">
-                            <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                        <div className="absolute top-3 right-3 bg-yellow-500 text-black text-xs font-bold px-2 py-1 rounded-md shadow-sm flex items-center gap-2 whitespace-nowrap">
+                            {/* flame icon (ไฟ) */}
+                            <svg
+                                className="w-4 h-4 flex-shrink-0"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                xmlns="http://www.w3.org/2000/svg"
+                                aria-hidden="true"
+                                focusable="false"
+                            >
+                                <path
+                                    d="M12.8324 21.8013C15.9583 21.1747 20 18.926 20 13.1112C20 7.8196 16.1267 4.29593 13.3415 2.67685C12.7235 2.31757 12 2.79006 12 3.50492V5.3334C12 6.77526 11.3938 9.40711 9.70932 10.5018C8.84932 11.0607 7.92052 10.2242 7.816 9.20388L7.73017 8.36604C7.6304 7.39203 6.63841 6.80075 5.85996 7.3946C4.46147 8.46144 3 10.3296 3 13.1112C3 20.2223 8.28889 22.0001 10.9333 22.0001C11.0871 22.0001 11.2488 21.9955 11.4171 21.9858C10.1113 21.8742 8 21.064 8 18.4442C8 16.3949 9.49507 15.0085 10.631 14.3346C10.9365 14.1533 11.2941 14.3887 11.2941 14.7439V15.3331C11.2941 15.784 11.4685 16.4889 11.8836 16.9714C12.3534 17.5174 13.0429 16.9454 13.0985 16.2273C13.1161 16.0008 13.3439 15.8564 13.5401 15.9711C14.1814 16.3459 15 17.1465 15 18.4442C15 20.4922 13.871 21.4343 12.8324 21.8013Z"
+                                    fill="#ff5900"
+                                />
                             </svg>
-                            ยอดนิยม
+
+                            <span className="leading-none">ยอดนิยม</span>
                         </div>
                     )}
                 </div>
@@ -354,16 +366,7 @@ export default function GameShop({ initialQuery = '' }) {
                     </div>
 
                     <div className="space-y-2 text-sm text-gray-300 mb-4">
-                        <div className="flex items-center">
-                            <div className="flex text-yellow-400">
-                                {[...Array(5)].map((_, i) => (
-                                    <svg key={i} className={`w-4 h-4 ${i < Math.floor(game.rating) ? 'text-yellow-400' : 'text-gray-600'}`} fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                                    </svg>
-                                ))}
-                            </div>
-                            <span className="ml-1 text-gray-400">({game.reviews} รีวิว)</span>
-                        </div>
+
                         <div className="flex items-center justify-between">
                             <div>
                                 {game.originalPrice > game.price && (
@@ -381,12 +384,7 @@ export default function GameShop({ initialQuery = '' }) {
                             <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                             </svg>
-                            เพิ่มลงตะกร้า
-                        </button>
-                        <button className="text-gray-400 hover:text-red-500 transition-colors p-2">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                            </svg>
+                            สั่งซื้อสินค้า
                         </button>
                     </div>
                 </div>
@@ -398,7 +396,7 @@ export default function GameShop({ initialQuery = '' }) {
     const GameListItem = ({ game }) => {
         const [imgSrc, setImgSrc] = useState(game.image);
         const [imgError, setImgError] = useState(false);
-        
+
         const handleImageError = () => {
             if (!imgError) {
                 setImgError(true);
@@ -412,11 +410,11 @@ export default function GameShop({ initialQuery = '' }) {
                     "Party": "https://images.unsplash.com/photo-1601828688063-932a274f7a5c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80",
                     "Strategy": "https://images.unsplash.com/photo-1511512578047-d6360b94f7fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80"
                 };
-                
+
                 setImgSrc(fallbackImages[game.category] || "https://images.unsplash.com/photo-1511512578047-d6360b94f7fb?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1170&q=80");
             }
         };
-        
+
         return (
             <div className="bg-gray-900 rounded-lg shadow-sm border border-purple-800 p-4 hover:shadow-md transition-shadow flex items-center gap-4">
                 <div className="relative h-20 w-28 flex-shrink-0 rounded overflow-hidden">
@@ -429,8 +427,8 @@ export default function GameShop({ initialQuery = '' }) {
                         unoptimized={true}
                     />
                     {game.discount > 0 && (
-                        <div className="absolute top-1 left-1 bg-red-600 text-white text-xs font-bold px-1 py-0.5 rounded">
-                            -{game.discount}%
+                        <div className="absolute top-1 left-1 bg-green-600 text-white text-xs font-bold px-1 py-0.5 rounded">
+                            ใหม่
                         </div>
                     )}
                 </div>

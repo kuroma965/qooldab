@@ -8,6 +8,7 @@ export default function Navbar() {
   const { data: session, status } = useSession();
   const isAuthenticated = status === 'authenticated';
   const isLoading = status === 'loading';
+  const isAdmin = session?.user?.role === 'admin';
 
   const pathname = usePathname();
   const router = useRouter();
@@ -83,11 +84,11 @@ export default function Navbar() {
             </Link>
 
             <Link
-              href="/games"
-              className={`px-3 py-2 rounded-md text-sm font-medium ${pathname === '/games' ? 'bg-purple-500 text-white' : 'text-gray-300 hover:bg-purple-800 hover:text-white'
+              href="/products"
+              className={`px-3 py-2 rounded-md text-sm font-medium ${pathname === '/products' ? 'bg-purple-500 text-white' : 'text-gray-300 hover:bg-purple-800 hover:text-white'
                 }`}
             >
-              เกมทั้งหมด
+              สินค้าทั้งหมด
             </Link>
 
             <Link
@@ -106,12 +107,15 @@ export default function Navbar() {
               โปรโมชั่น
             </Link>
 
-            <Link href="/cart" className="relative p-1 text-gray-300 hover:text-white">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">3</span>
-            </Link>
+            {/* Admin panel link (แสดงเมื่อเป็น admin) */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="px-3 py-2 rounded-md text-sm font-medium bg-gray-500 text-white hover:opacity-90"
+              >
+                Admin Panel
+              </Link>
+            )}
 
             <div className="hidden md:flex items-center space-x-2 ml-6">
               {/* not authenticated */}
@@ -127,7 +131,6 @@ export default function Navbar() {
                   >
                     เข้าสู่ระบบ
                   </Link>
-
                 </>
               )}
 
@@ -145,11 +148,20 @@ export default function Navbar() {
                   </button>
 
                   {isUserMenuOpen && (
-                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                    <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                       <div className="py-1">
                         <Link href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           ดูโปรไฟล์
                         </Link>
+                        <Link href="/account/history" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                          ประวัติการสั่งซื้อ
+                        </Link>
+                        {/* ถ้าเป็น admin ให้โชว์ลิงก์ไปยัง admin panel ใน dropdown ด้วย */}
+                        {isAdmin && (
+                          <Link href="/admin" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                            Admin Panel
+                          </Link>
+                        )}
                         <button onClick={logout} className="w-full text-left block px-4 py-2 text-sm text-red-600 hover:bg-gray-100">
                           ออกจากระบบ
                         </button>
@@ -186,8 +198,8 @@ export default function Navbar() {
             <Link href="/" className="block px-3 py-2 rounded-md text-base font-medium text-white hover:bg-purple-800">
               หน้าแรก
             </Link>
-            <Link href="/games" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
-              เกมทั้งหมด
+            <Link href="/products" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
+              สินค้าทั้งหมด
             </Link>
             <Link href="/categories" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
               หมวดหมู่
@@ -195,12 +207,13 @@ export default function Navbar() {
             <Link href="/promotions" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
               โปรโมชั่น
             </Link>
-            <Link href="/cart" className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
-              <svg className="h-5 w-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              ตะกร้าสินค้า
-            </Link>
+
+            {/* Mobile: admin link */}
+            {isAdmin && (
+              <Link href="/admin" className="block px-3 py-2 rounded-md text-base font-medium bg-red-600 text-white hover:opacity-90">
+                Admin Panel
+              </Link>
+            )}
 
             {!isAuthenticated && !isLoading && (
               <>
@@ -210,7 +223,6 @@ export default function Navbar() {
                 <Link href="/login" className="block w-full text-left px-3 py-2 rounded-md text-base font-medium bg-purple-600 text-white hover:opacity-90">
                   เข้าสู่ระบบ
                 </Link>
-
               </>
             )}
 
@@ -218,6 +230,9 @@ export default function Navbar() {
               <>
                 <Link href="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
                   บัญชีของฉัน
+                </Link>
+                <Link href="/account/history" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">
+                  ประวัติการสั่งซื้อ
                 </Link>
                 <button onClick={logout} className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-purple-800 hover:text-white">
                   ออกจากระบบ
