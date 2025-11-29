@@ -1,5 +1,5 @@
 {
-  "id": "408a6b65-f8c6-43fb-b7eb-d8dda6680075",
+  "id": "548026b5-2f3c-48ae-b971-ad5765534404",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -45,6 +45,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": true
+        },
+        "sign_up": {
+          "name": "sign_up",
+          "type": "varchar(50)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'qooldab'"
         },
         "created_at": {
           "name": "created_at",
