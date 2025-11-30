@@ -1,4 +1,4 @@
-// lib/api.js
+// lib/Cats-Prod-Db.js
 /**
  * Utility for calling products & categories API and mapping category_id -> category name
  * Usage:
