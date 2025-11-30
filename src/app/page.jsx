@@ -1,6 +1,6 @@
 // src/app/page.js
 import React from 'react';
-import GameShop from '../components/GameShop.jsx.jsx'; 
+import GameShop from '../components/GameShop.jsx'; 
 import Navbar from '@/components/common/Navbar';
 
 export default function Page() {

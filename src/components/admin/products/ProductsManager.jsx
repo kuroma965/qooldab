@@ -1,0 +1,420 @@
+// components/admin/products/ProductsManager.jsx
+'use client';
+import React, { useEffect, useState, useCallback } from 'react';
+
+function slugify(s = '') {
+  return String(s)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^\w\-]+/g, '')
+    .replace(/--+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+function Modal({ open, title, onClose, children }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+      <div className="relative z-10 w-full max-w-3xl bg-gray-900 border border-gray-800 rounded-lg p-6 shadow-lg">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">✕</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export default function ProductsManager({
+  apiBase = '/api/admin/products',
+  categoriesApi = '/api/admin/categories', // to fetch categories for select
+}) {
+  const [items, setItems] = useState([]);
+  const [q, setQ] = useState('');
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(12);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+
+  const [name, setName] = useState('');
+  const [slug, setSlug] = useState('');
+  const [description, setDescription] = useState('');
+  const [price, setPrice] = useState(0);
+  const [stock, setStock] = useState(0);
+  const [categoryId, setCategoryId] = useState(null);
+  const [image, setImage] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  const [categories, setCategories] = useState([]);
+
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await fetch(`${categoriesApi}?page=1&limit=100`, { credentials: 'include' });
+      if (!res.ok) return;
+      const json = await res.json();
+      setCategories(json.items || json);
+    } catch (e) {
+      console.error('fetchCategories', e);
+    }
+  }, [categoriesApi]);
+
+  const fetchList = useCallback(async (pageArg = page, qArg = q) => {
+    setLoading(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (qArg) params.set('q', qArg);
+      params.set('page', String(pageArg));
+      params.set('limit', String(limit));
+      const res = await fetch(`${apiBase}?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        credentials: 'include',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error || `Failed to load (${res.status})`);
+      }
+      const data = await res.json();
+      setItems(data.items || []);
+      setTotal(data.total ?? (data.items ? data.items.length : 0));
+      setPage(data.page ?? pageArg);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || 'Unknown error');
+      setItems([]);
+      setTotal(0);
+    } finally {
+      setLoading(false);
+    }
+  }, [apiBase, limit, page, q]);
+
+  useEffect(() => { fetchCategories(); }, [fetchCategories]);
+
+  useEffect(() => { fetchList(1, q); /* eslint-disable-next-line */ }, [q, limit]);
+
+  useEffect(() => { fetchList(page, q); }, [page, fetchList, q]);
+
+  function resetForm() {
+    setName(''); setSlug(''); setDescription(''); setPrice(0); setStock(0); setCategoryId(null); setImage(''); setEditing(null); setMessage('');
+  }
+
+  async function uploadFileToServer(file) {
+    try {
+      setUploading(true);
+      setMessage('กำลังอัพโหลดรูป...');
+      const fd = new FormData();
+      fd.append('file', file, file.name);
+      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || `Upload failed (${res.status})`);
+      const img = json?.image;
+      const url = img?.display_url || img?.url;
+      if (!url) throw new Error('no image url returned');
+      setImage(url);
+      setMessage('อัพโหลดรูปเรียบร้อย');
+      return url;
+    } catch (err) {
+      console.error('uploadFileToServer error', err);
+      setMessage(err.message || 'Upload failed');
+      throw err;
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function onFileInputChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try { await uploadFileToServer(file); } catch (_) {}
+  }
+
+  async function handleCreate(e) {
+    e.preventDefault();
+    setMessage('');
+    if (!name.trim()) return setMessage('ชื่อต้องไม่ว่าง');
+    const payload = {
+      name: name.trim(),
+      slug: slugify(slug || name),
+      description: description || null,
+      price: Number(price || 0),
+      stock: Number(stock || 0),
+      sold: 0,
+      category_id: categoryId ? Number(categoryId) : null,
+      image: image || null,
+    };
+    try {
+      const res = await fetch(apiBase, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `Create failed (${res.status})`);
+      setMessage('สร้างสินค้าเรียบร้อย');
+      setCreateOpen(false);
+      resetForm();
+      setPage(1);
+      fetchList(1, q);
+    } catch (err) {
+      console.error(err);
+      setMessage(err.message || 'เกิดข้อผิดพลาด');
+    }
+  }
+
+  function openEdit(p) {
+    setEditing(p);
+    setName(p.name ?? '');
+    setSlug(p.slug ?? '');
+    setDescription(p.description ?? '');
+    setPrice(p.price ?? 0);
+    setStock(p.stock ?? 0);
+    setCategoryId(p.category_id ?? null);
+    setImage(p.image ?? '');
+    setEditOpen(true);
+    setMessage('');
+  }
+
+  async function handleEdit(e) {
+    e.preventDefault();
+    if (!editing) return setMessage('ไม่มีรายการที่จะแก้ไข');
+    if (!name.trim()) return setMessage('ชื่อต้องไม่ว่าง');
+    const payload = {
+      name: name.trim(),
+      slug: slugify(slug || name),
+      description: description || null,
+      price: Number(price || 0),
+      stock: Number(stock || 0),
+      category_id: categoryId ? Number(categoryId) : null,
+      image: image || null,
+    };
+    try {
+      const res = await fetch(`${apiBase}/${editing.id}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data?.error || `Update failed (${res.status})`);
+      setMessage('อัพเดตเรียบร้อย');
+      setEditOpen(false);
+      resetForm();
+      fetchList(page, q);
+    } catch (err) {
+      console.error(err);
+      setMessage(err.message || 'เกิดข้อผิดพลาด');
+    }
+  }
+
+  async function handleDelete(p) {
+    if (!confirm(`ยืนยันลบ "${p.name}" ?`)) return;
+    try {
+      const res = await fetch(`${apiBase}/${p.id}`, { method: 'DELETE', credentials: 'include' });
+      const data = await res.json().catch(()=>({}));
+      if (!res.ok) throw new Error(data?.error || `Delete failed (${res.status})`);
+      setMessage('ลบเรียบร้อย');
+      const newTotal = Math.max(0, total - 1);
+      const lastPage = Math.max(1, Math.ceil(newTotal / limit));
+      if (page > lastPage) setPage(lastPage);
+      else fetchList(page, q);
+    } catch (err) {
+      console.error(err);
+      setMessage(err.message || 'เกิดข้อผิดพลาด');
+    }
+  }
+
+  return (
+    <div className="p-6 bg-gray-950 min-h-[60vh]">
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl font-bold text-white">จัดการสินค้า</h1>
+          <div className="flex items-center gap-3">
+            <button onClick={() => { resetForm(); setCreateOpen(true); }} className="px-4 py-2 bg-green-600 hover:bg-green-700 rounded text-white font-medium">+ สร้างใหม่</button>
+          </div>
+        </div>
+
+        <div className="flex gap-3 items-center mb-4">
+          <input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="ค้นหา (ชื่อ, slug, รายละเอียด)" className="px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white w-full" />
+          <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="px-3 py-2 bg-gray-900 border border-gray-700 rounded text-white">
+            <option value={6}>6</option>
+            <option value={12}>12</option>
+            <option value={24}>24</option>
+          </select>
+        </div>
+
+        {message && <div className="mb-4 px-4 py-2 bg-green-700/20 border border-green-700 text-green-200 rounded">{message}</div>}
+        {error && <div className="mb-4 px-4 py-2 bg-red-700/20 border border-red-700 text-red-200 rounded">{error}</div>}
+
+        <div className="bg-gray-900 border border-gray-800 rounded-lg overflow-hidden">
+          <table className="min-w-full text-left">
+            <thead className="bg-gray-800">
+              <tr>
+                <th className="px-4 py-3 text-sm text-gray-300">ID</th>
+                <th className="px-4 py-3 text-sm text-gray-300">ชื่อ</th>
+                <th className="px-4 py-3 text-sm text-gray-300">ราคา</th>
+                <th className="px-4 py-3 text-sm text-gray-300">สต็อก</th>
+                <th className="px-4 py-3 text-sm text-gray-300">หมวด</th>
+                <th className="px-4 py-3 text-sm text-gray-300">รูป</th>
+                <th className="px-4 py-3 text-sm text-gray-300 text-right">การกระทำ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr><td colSpan="7" className="px-4 py-6 text-center text-gray-400">กำลังโหลด...</td></tr>
+              ) : items.length === 0 ? (
+                <tr><td colSpan="7" className="px-4 py-6 text-center text-gray-400">ไม่พบสินค้า</td></tr>
+              ) : (
+                items.map(p => (
+                  <tr key={p.id} className="border-t border-gray-800">
+                    <td className="px-4 py-3 text-sm text-gray-300">{p.id}</td>
+                    <td className="px-4 py-3 text-sm text-white">{p.name}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{Number(p.price).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{p.stock}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{p.category_id ?? '-'}</td>
+                    <td className="px-4 py-3 text-sm text-gray-300">{p.image ? <img src={p.image} alt={p.name} className="h-8 w-12 object-cover rounded" /> : <span className="text-gray-500">-</span>}</td>
+                    <td className="px-4 py-3 text-sm text-right">
+                      <div className="inline-flex gap-2">
+                        <button onClick={() => openEdit(p)} className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded">แก้ไข</button>
+                        <button onClick={() => handleDelete(p)} className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded">ลบ</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center justify-between mt-4">
+          <div className="text-sm text-gray-400">รวม {total} รายการ</div>
+          <div className="flex items-center gap-2">
+            <button disabled={page <= 1} onClick={() => setPage(p => Math.max(1, p - 1))} className="px-3 py-1 rounded bg-gray-800 text-white disabled:opacity-50">ก่อนหน้า</button>
+            <div className="px-3 py-1 text-sm text-gray-300">หน้า {page} / {Math.max(1, Math.ceil(total / limit))}</div>
+            <button disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded bg-gray-800 text-white disabled:opacity-50">ถัดไป</button>
+          </div>
+        </div>
+      </div>
+
+      {/* Create Modal */}
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="สร้างสินค้าใหม่">
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-300">ชื่อ</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm text-gray-300">slug (ถ้าว่างจะสร้างจากชื่อ)</label>
+              <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-300">ราคา</label>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-300">สต็อก</label>
+              <input type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">หมวด</label>
+            <select value={categoryId ?? ''} onChange={(e) => setCategoryId(e.target.value || null)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white">
+              <option value="">-- ไม่เลือก --</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">รูปภาพ (URL หรืออัพโหลด)</label>
+            <div className="flex gap-2 items-center mt-1">
+              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="วาง URL หรือกด Upload" className="flex-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+              <label className="px-3 py-2 bg-gray-700 text-white rounded cursor-pointer">
+                เลือกไฟล์
+                <input type="file" accept="image/*" onChange={onFileInputChange} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {uploading && <div className="text-sm text-gray-300 mt-1">กำลังอัพโหลด...</div>}
+            <div className="flex justify-center mt-2">{image && <img src={image} alt="preview" className="mt-2 max-h-40 max-w-full object-contain rounded" />}</div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">คำอธิบาย</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 bg-gray-700 text-white rounded">ยกเลิก</button>
+            <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded">บันทึก</button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Edit Modal */}
+      <Modal open={editOpen} onClose={() => setEditOpen(false)} title="แก้ไขสินค้า">
+        <form onSubmit={handleEdit} className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-300">ชื่อ</label>
+            <input value={name} onChange={(e) => setName(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-sm text-gray-300">slug</label>
+              <input value={slug} onChange={(e) => setSlug(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-300">ราคา</label>
+              <input type="number" value={price} onChange={(e) => setPrice(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+            <div>
+              <label className="text-sm text-gray-300">สต็อก</label>
+              <input type="number" value={stock} onChange={(e) => setStock(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">หมวด</label>
+            <select value={categoryId ?? ''} onChange={(e) => setCategoryId(e.target.value || null)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white">
+              <option value="">-- ไม่เลือก --</option>
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">รูปภาพ (URL หรืออัพโหลด)</label>
+            <div className="flex gap-2 items-center mt-1">
+              <input value={image} onChange={(e) => setImage(e.target.value)} placeholder="วาง URL หรือกด Upload" className="flex-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+              <label className="px-3 py-2 bg-gray-700 text-white rounded cursor-pointer">
+                เลือกไฟล์
+                <input type="file" accept="image/*" onChange={onFileInputChange} style={{ display: 'none' }} />
+              </label>
+            </div>
+            {uploading && <div className="text-sm text-gray-300 mt-1">กำลังอัพโหลด...</div>}
+            <div className="flex justify-center mt-2">{image && <img src={image} alt="preview" className="mt-2 max-h-40 max-w-full object-contain rounded" />}</div>
+          </div>
+
+          <div>
+            <label className="text-sm text-gray-300">คำอธิบาย</label>
+            <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded text-white" />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2">
+            <button type="button" onClick={() => setEditOpen(false)} className="px-4 py-2 bg-gray-700 text-white rounded">ยกเลิก</button>
+            <button type="submit" className="px-4 py-2 bg-yellow-600 text-white rounded">บันทึกการแก้ไข</button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  );
+}

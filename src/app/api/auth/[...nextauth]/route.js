@@ -5,34 +5,39 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 
-import { db } from "@/db/db";      // ปรับ path ถ้าจำเป็น
+import { db } from "@/db/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 10);
 const SECRET_SIGNUP_GOOGLE = process.env.SECRET_SIGNUP_GOOGLE || "";
-const IS_DEV = process.env.NODE_ENV !== "production";
 
-function sha256Hex(input) {
-  return crypto.createHash("sha256").update(input).digest("hex");
+function formatCreditsRaw(val) {
+  // DB numeric may come as string e.g. "12.50" — normalize to "00.00" style string
+  try {
+    const n = Number(val ?? 0);
+    if (Number.isNaN(n)) return "0.00";
+    return n.toFixed(2);
+  } catch (e) {
+    return "0.00";
+  }
 }
 
-async function createUser({ email, passwordHash, name, sign_up = "credentials" }) {
+async function createUser({ email, passwordHash, name, sign_up = "credentials", image = null }) {
   const insertObj = {
     email,
     password_hash: passwordHash,
     name: name ?? null,
     sign_up,
+    image: image ?? null,
     created_at: new Date(),
     updated_at: new Date(),
   };
   try {
     const res = await db.insert(users).values(insertObj).returning();
-    // some drivers return array, some return undefined; normalize
     if (res && res[0]) return res[0];
-    // fallback
+    // fallback for drivers that don't return
     await db.insert(users).values(insertObj).run();
     const r = await db.select().from(users).where(eq(users.email, email)).limit(1);
     return r[0];
@@ -41,17 +46,34 @@ async function createUser({ email, passwordHash, name, sign_up = "credentials" }
   }
 }
 
-/** Ensure user exists for given google email. If not, create derived password user. */
-async function ensureUserForGoogle(email, name) {
+/**
+ * ensureUserForGoogle:
+ *  - If DB has user with same email and sign_up !== 'google', THROW an Error with message we can detect
+ *  - If no user, create with passwordHash = null and sign_up = 'google'
+ */
+async function ensureUserForGoogle(email, name, picture = null) {
   const normalized = String(email).trim().toLowerCase();
   const rows = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
-  if (rows.length) return rows[0];
+  if (rows.length) {
+    const existing = rows[0];
+    // If user exists but was NOT created via google, block sign-in via google
+    if (existing.sign_up && String(existing.sign_up).toLowerCase() !== "google") {
+      // Throw an error with a clear message we can check in signIn
+      throw new Error("NOT_GOOGLE_SIGNUP"); // short machine message
+    }
+    return existing;
+  }
 
   if (!SECRET_SIGNUP_GOOGLE) throw new Error("SECRET_SIGNUP_GOOGLE not configured");
 
-  const derived = sha256Hex(normalized + SECRET_SIGNUP_GOOGLE);
-  const hashed = await bcrypt.hash(derived, BCRYPT_ROUNDS);
-  const created = await createUser({ email: normalized, passwordHash: hashed, name, sign_up: "google" });
+  // create user with null password (google signups)
+  const created = await createUser({
+    email: normalized,
+    passwordHash: null,
+    name,
+    sign_up: "google",
+    image: picture ?? null,
+  });
   return created;
 }
 
@@ -88,33 +110,54 @@ export const authOptions = {
             if (existing) {
               throw new Error("Email already in use");
             }
-            if (!credentials?.password || String(credentials.password).length < 6) {
-              throw new Error("Password required (min 6 chars)");
+            if (!credentials?.password || String(credentials.password).length < 8) {
+              throw new Error("Password required (min 8 chars)");
             }
             const hashed = await bcrypt.hash(String(credentials.password), BCRYPT_ROUNDS);
-            const created = await createUser({ email, passwordHash: hashed, name: credentials.name ?? null, sign_up: "credentials" });
+            const created = await createUser({
+              email,
+              passwordHash: hashed,
+              name: credentials.name ?? null,
+              sign_up: "credentials",
+            });
             if (!created) throw new Error("Failed to create user");
-            // return user object including role so jwt callback can persist it
-            return { id: String(created.id), name: created.name ?? null, email: created.email, role: created.role ?? "user" };
+
+            return {
+              id: String(created.id),
+              name: created.name ?? null,
+              email: created.email,
+              role: created.role ?? "user",
+              image: created.image ?? null,
+              updated_at: created.updated_at ? new Date(created.updated_at).toISOString() : undefined,
+              credits: formatCreditsRaw(created.credits), // <- add credits
+            };
           } else {
             // login flow
             if (!existing) {
-              throw new Error("Invalid credentials");
+              throw new Error("Invalid_credentials");
             }
 
             // If this account was created via Google, tell the user to use Google sign-in
             if (existing.sign_up && String(existing.sign_up).toLowerCase() === "google") {
-              throw new Error("บัญชีนี้สมัครผ่าน Google กรุณาเข้าสู่ระบบด้วย Google");
+              // throw with friendly message (NextAuth will send it to pages.error if configured)
+              throw new Error("อีเมลนี้สมัครผ่าน Google กรุณาเข้าสู่ระบบด้วย Google");
             }
 
             if (!credentials?.password) {
               throw new Error("Password required");
             }
             const ok = await bcrypt.compare(String(credentials.password), existing.password_hash);
-            if (!ok) throw new Error("Invalid credentials");
+            if (!ok) throw new Error("Invalid_credentials");
 
-            // return object including role
-            return { id: String(existing.id), name: existing.name ?? null, email: existing.email, role: existing.role ?? "user" };
+            return {
+              id: String(existing.id),
+              name: existing.name ?? null,
+              email: existing.email,
+              role: existing.role ?? "user",
+              image: existing.image ?? null,
+              updated_at: existing.updated_at ? new Date(existing.updated_at).toISOString() : undefined,
+              credits: formatCreditsRaw(existing.credits), // <- add credits
+            };
           }
         } catch (err) {
           console.error("Credentials authorize error:", err?.message ?? err);
@@ -129,6 +172,12 @@ export const authOptions = {
     }),
   ],
 
+  // Put pages at top-level so NextAuth knows where to redirect on errors
+  pages: {
+    signIn: '/login',
+    error: '/login', // NextAuth will redirect to /login?error=... when we return a URL or throw
+  },
+
   // Use JWT sessions (stateless). NextAuth stores session in signed cookie.
   session: { strategy: "jwt" },
 
@@ -139,27 +188,42 @@ export const authOptions = {
         if (account?.provider === "google") {
           const googleEmail = profile?.email || user?.email;
           if (!googleEmail) {
-            console.warn("Google signIn: no email in profile");
-            return false;
+            // return error page
+            return `/login?error=${encodeURIComponent("google_no_email")}`;
           }
 
-          // Ensure user row exists (create if missing)
-          const dbUser = await ensureUserForGoogle(googleEmail, profile?.name ?? user?.name);
-          if (!dbUser) {
-            console.error("ensureUserForGoogle failed to return a user row");
-            return false;
-          }
+          // Try to ensure the DB user exists. ensureUserForGoogle throws "NOT_GOOGLE_SIGNUP"
+          // if there is an existing non-google signup (we handle that below)
+          try {
+            const dbUser = await ensureUserForGoogle(googleEmail, profile?.name ?? user?.name, profile?.picture ?? null);
 
-          // Attach DB id and role to the `user` object so jwt callback can use it
-          user.id = String(dbUser.id);
-          user.name = user.name ?? dbUser.name ?? null;
-          user.email = user.email ?? dbUser.email;
-          user.role = dbUser.role ?? "user";
+            // success: attach DB values (prefer DB)
+            user.id = String(dbUser.id);
+            user.name = dbUser.name ?? null;
+            user.email = dbUser.email;
+            user.role = dbUser.role ?? "user";
+            user.image = profile?.picture ?? null;
+            user.updated_at = dbUser.updated_at ? new Date(dbUser.updated_at).toISOString() : undefined;
+            user.credits = formatCreditsRaw(dbUser.credits); // <- add credits
+
+            return true; // allow sign in
+          } catch (err) {
+            // handle the NOT_GOOGLE_SIGNUP case gracefully by redirecting to /login with our own code
+            const msg = String(err?.message ?? "");
+            if (msg === "NOT_GOOGLE_SIGNUP") {
+              // redirect user to login page with friendly error code
+              return `/login?error=${encodeURIComponent("not_google")}`;
+            }
+            // other errors -> surface as generic nextauth error (will go to pages.error)
+            console.error("ensureUserForGoogle error:", err);
+            throw err;
+          }
         }
         return true;
       } catch (err) {
-        console.error("signIn callback error:", err);
-        return false;
+        console.error("signIn callback error:", err?.message ?? err);
+        // If we throw, NextAuth will redirect to pages.error (we set it to /login)
+        throw err;
       }
     },
 
@@ -171,27 +235,62 @@ export const authOptions = {
         if (user.email) token.email = user.email;
         if (user.name) token.name = user.name;
         if (user.role) token.role = user.role;
+        if (user.image) token.image = user.image;
+        // keep updated_at as ISO string if present
+        if (user.updated_at) token.updated_at = String(user.updated_at);
+        // credits (string like "12.50")
+        if (typeof user.credits !== "undefined") token.credits = String(user.credits);
       }
-      // token persists afterwards
       return token;
     },
 
     // What client receives via useSession/getSession
     async session({ session, token }) {
-      if (token) {
-        session.user = session.user || {};
-        if (token.id) session.user.id = token.id;
-        if (token.email) session.user.email = token.email;
-        if (token.name) session.user.name = token.name;
-        if (token.role) session.user.role = token.role;
+      session.user = session.user || {};
+      if (token?.id) session.user.id = token.id;
+      if (token?.email) session.user.email = token.email;
+      if (token?.name) session.user.name = token.name;
+      if (token?.role) session.user.role = token.role;
+      if (token?.image) session.user.image = token.image;
+      if (token?.updated_at) session.user.updated_at = token.updated_at;
+
+      // include credits from token if present (token.credits is string with 2 decimals)
+      if (typeof token?.credits !== "undefined") {
+        session.user.credits = String(token.credits);
+      } else {
+        session.user.credits = "0.00";
       }
+
+      // try to refresh from DB (optional) — update credits from DB if possible
+      try {
+        if (token?.id) {
+          const uid = Number(token.id);
+          const rows = await db.select().from(users).where(eq(users.id, uid)).limit(1);
+          const dbUser = rows[0] ?? null;
+          if (dbUser) {
+            session.user.name = dbUser.name ?? session.user.name;
+            session.user.email = dbUser.email ?? session.user.email;
+            if (Object.prototype.hasOwnProperty.call(dbUser, 'image')) {
+              session.user.image = dbUser.image ?? null;
+            }
+            session.user.role = dbUser.role ?? session.user.role;
+            session.user.updated_at = dbUser.updated_at ? new Date(dbUser.updated_at).toISOString() : session.user.updated_at;
+
+            // update credits from DB (ensure formatted)
+            session.user.credits = formatCreditsRaw(dbUser.credits);
+          }
+        }
+      } catch (err) {
+        console.error("session callback: failed to read user from DB:", err);
+      }
+
       return session;
     },
   },
 
   // secrets
   secret: process.env.NEXTAUTH_SECRET,
-  debug: IS_DEV,
+  debug: false,
 };
 
 const handler = NextAuth(authOptions);

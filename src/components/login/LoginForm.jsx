@@ -1,15 +1,43 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function LoginForm({ redirectTo = '/account' }) {
   const router = useRouter();
+  const params = useSearchParams();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loadingSignin, setLoadingSignin] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
   const [error, setError] = useState('');
+
+  // map error keys to user-friendly messages
+  const ERROR_MESSAGES = {
+    not_google: 'อีเมลนี้ไม่ได้สมัครผ่าน Google — กรุณาเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน',
+    google_no_email: 'ไม่สามารถอ่านอีเมลจาก Google ได้ โปรดลองอีกครั้ง หรือใช้วิธีการเข้าสู่ระบบอื่น',
+    Invalid_credentials: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+    // ถ้ามีข้อความอื่น ๆ ที่ NextAuth ส่งเป็น plain text เราจะแสดง decodeURIComponent
+  };
+
+  // read ?error= on mount (so Google redirect or nextauth error shows)
+  useEffect(() => {
+    const e = params.get('error');
+    if (!e) return;
+    // try friendly mapping first, else decode
+    const friendly = ERROR_MESSAGES[e] ?? ERROR_MESSAGES[decodeURIComponent(e)] ?? null;
+    if (friendly) setError(friendly);
+    else {
+      // fallback: show raw but decoded (and keep it short)
+      try {
+        const decoded = decodeURIComponent(e);
+        setError(decoded.length > 200 ? decoded.slice(0, 200) + '...' : decoded);
+      } catch {
+        setError(e);
+      }
+    }
+  }, [params]);
 
   // simple email validator
   function validateEmail(e) {
@@ -48,12 +76,13 @@ export default function LoginForm({ redirectTo = '/account' }) {
         password,
       });
 
-      // In dev you can inspect res in console if needed:
-      // console.log('signIn res:', res);
-
+      // NextAuth send back error string when redirect:false
       if (res?.error) {
-        // NextAuth returns error message from authorize() when redirect: false
-        setError(res.error || 'เข้าสู่ระบบไม่สำเร็จ');
+        // try to decode and map to friendly message
+        const raw = res.error;
+        const friendly = ERROR_MESSAGES[raw] ?? ERROR_MESSAGES[decodeURIComponent(raw)] ?? null;
+        if (friendly) setError(friendly);
+        else setError(raw);
       } else {
         // success: NextAuth sets cookie; redirect to protected page
         router.push(redirectTo);
@@ -80,7 +109,6 @@ export default function LoginForm({ redirectTo = '/account' }) {
 
       // This redirects browser to Google. callbackUrl will bring user back.
       await nextAuth.signIn('google', { callbackUrl: redirectTo });
-
       // usually redirect happens and code below won't run
     } catch (err) {
       console.error('Google sign-in error:', err);
@@ -182,8 +210,8 @@ export default function LoginForm({ redirectTo = '/account' }) {
             </>
           ) : (
             <>
-              <svg className="h-5 w-5" viewBox="0 0 24 24" aria-hidden>
-                <path fill="#EA4335" d="M12 11.5v2.8h4.1c-.2 1.2-1 3.2-4.1 3.2-2.5 0-4.6-2-4.6-4.6S9.5 8.5 12 8.5c1.4 0 2.3.6 2.8 1l1.9-1.8C15.5 6 13.9 5.2 12 5.2 7.6 5.2 4 8.8 4 13.2S7.6 21.2 12 21.2c5 0 8.2-3.6 8.2-8.7 0-.6-.1-1.1-.2-1.6H12z"/>
+              <svg className='h-5 w-5' xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" viewBox="0 0 48 48">
+                <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"></path><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"></path><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"></path><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"></path>
               </svg>
               <span>เข้าสู่ระบบด้วย Google</span>
             </>
