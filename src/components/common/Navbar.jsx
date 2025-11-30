@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useSession, signOut } from 'next-auth/react';
 
 export default function Navbar() {
   const { data: session, status } = useSession();
@@ -59,6 +59,9 @@ export default function Navbar() {
       <circle cx="12" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} />
     </svg>
   );
+
+  // format credits (session may provide string "12.50")
+  const creditsLabel = (session?.user?.credits != null) ? String(session.user.credits) : '0.00';
 
   return (
     <nav className="bg-black shadow-lg sticky top-0 z-50">
@@ -138,9 +141,24 @@ export default function Navbar() {
 
               {/* authenticated */}
               {isAuthenticated && (
+                // move ref to wrapper so click-outside includes the credits pill
                 <div className="relative" ref={userMenuRef}>
-                  <button onClick={toggleUserMenu} className="flex items-center p-1 rounded-full text-gray-300 hover:text-white focus:outline-none" aria-haspopup="true" aria-expanded={isUserMenuOpen}>
+                  <button
+                    onClick={toggleUserMenu}
+                    className="flex items-center p-1 rounded-full text-gray-300 hover:text-white focus:outline-none"
+                    aria-haspopup="true"
+                    aria-expanded={isUserMenuOpen}
+                  >
                     <span className="sr-only">Open user menu</span>
+
+                    {/* credits pill (left of icon) */}
+                    <span
+                      className="mr-2 inline-flex items-center px-2 py-1 rounded-full bg-gray-800 text-sm font-medium text-gray-200 border border-gray-700"
+                      title={`Credits: ${creditsLabel}`}
+                    >
+                      ฿{creditsLabel}
+                    </span>
+
                     {/* Always use SVG user icon */}
                     <div className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center">
                       <UserSvg className="h-5 w-5 text-gray-200" />

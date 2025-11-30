@@ -1,0 +1,1 @@
+ALTER TABLE "users" ADD COLUMN "credits" numeric(10, 2) DEFAULT 0 NOT NULL;
