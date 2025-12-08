@@ -1,9 +1,9 @@
-// components/AccountUser.jsx
+// components/ProfileUser.jsx
 'use client';
 import React, { useEffect, useState } from 'react';
 import { signOut, getSession } from 'next-auth/react';
 
-export default function AccountUser({ initialSession = null }) {
+export default function ProfileUser({ initialSession = null }) {
   // Use only session passed from server (initialSession)
   const session = initialSession ?? null;
   const initialUser = session?.user ?? null;
@@ -15,10 +15,14 @@ export default function AccountUser({ initialSession = null }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
+  // track if profile image failed to load
+  const [imageErrored, setImageErrored] = useState(false);
+
   // sync when initialSession changes (server -> client hydration)
   useEffect(() => {
     setUser(initialUser);
     setName(initialUser?.name ?? '');
+    setImageErrored(false);
   }, [initialUser]);
 
   const formatDate = (iso) => {
@@ -29,6 +33,31 @@ export default function AccountUser({ initialSession = null }) {
     } catch {
       return String(iso);
     }
+  };
+
+  // Format credits with commas and always show 2 decimal places
+  const formatCredits = (val) => {
+    const n = Number(val ?? 0);
+    if (!Number.isFinite(n)) return String(val ?? 0);
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n);
+  };
+
+  // helper to pick credits field from several possible names and coerce to Number when possible
+  const getUserCredits = (u) => {
+    if (!u) return 0;
+    const candidates = ['credits', 'credit', 'balance', 'wallet', 'wallet_balance', 'points'];
+    for (const key of candidates) {
+      if (u[key] != null) {
+        // try to coerce numeric-looking strings into Number
+        const val = u[key];
+        const num = Number(val);
+        return Number.isFinite(num) ? num : val;
+      }
+    }
+    return 0;
   };
 
   async function handleSave(e) {
@@ -46,7 +75,7 @@ export default function AccountUser({ initialSession = null }) {
         payload.image = String(sessionImage).trim();
       }
 
-      const res = await fetch('/api/account', {
+      const res = await fetch('/api/profile', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -61,12 +90,10 @@ export default function AccountUser({ initialSession = null }) {
       setEditing(false);
       setSuccessMsg('บันทึกเรียบร้อย');
 
-      // Refresh NextAuth client session so other parts of app (useSession/getSession) reflect latest DB values.
-      // getSession() fetches /api/auth/session and updates the client-side session cache.
+      // Refresh NextAuth client session so other parts of app reflect latest DB values.
       try {
         const fresh = await getSession();
         if (fresh?.user) {
-          // prefer values from fresh session (if available), otherwise keep API response
           setUser((prev) => ({
             ...prev,
             ...data.user,
@@ -75,7 +102,6 @@ export default function AccountUser({ initialSession = null }) {
           setName(fresh.user?.name ?? data.user?.name ?? '');
         }
       } catch (err) {
-        // non-fatal: if session refresh fails, we've already updated UI from API response
         console.warn('Failed to refresh client session after profile update', err);
       }
 
@@ -100,6 +126,39 @@ export default function AccountUser({ initialSession = null }) {
     setError('');
   }
 
+  // Image element: show <img> if user.image exists and didn't error,
+  // otherwise show fallback SVG avatar.
+  const renderAvatar = () => {
+    const src = user?.image ? String(user.image).trim() : '';
+    if (src && !imageErrored) {
+      // use <img> (not next/image) so we can reliably catch onError client-side.
+      return (
+        // eslint-disable-next-line jsx-a11y/img-redundant-alt
+        <img
+          src={src}
+          alt="avatar"
+          className="w-24 h-24 rounded-full object-cover border-2 border-purple-700"
+          onError={() => setImageErrored(true)}
+        />
+      );
+    }
+
+    // fallback icon
+    return (
+      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 border-2 border-purple-700">
+        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
+          <circle cx="12" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
+        </svg>
+      </div>
+    );
+  };
+
+  // get credits and force numeric formatting
+  const rawCredits = getUserCredits(user);
+  // if rawCredits is numeric (Number) or numeric-string coerced earlier, format; else show as-is
+  const creditsLabel = Number.isFinite(Number(rawCredits)) ? formatCredits(Number(rawCredits)) : String(rawCredits ?? '');
+
   return (
     <div className="bg-gray-800 rounded-xl p-6 shadow-md border border-purple-800">
       <h1 className="text-2xl font-bold text-white mb-4">บัญชีของฉัน</h1>
@@ -107,18 +166,7 @@ export default function AccountUser({ initialSession = null }) {
       {error && <div className="mb-3 text-sm text-red-300">{error}</div>}
 
       <div className="flex gap-6 items-center">
-        <div>
-          {user?.image ? (
-            <img src={user.image} alt="avatar" className="w-24 h-24 rounded-full object-cover border-2 border-purple-700" />
-          ) : (
-            <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-gray-300">
-              <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-                <circle cx="12" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-              </svg>
-            </div>
-          )}
-        </div>
+        <div>{renderAvatar()}</div>
 
         <div className="flex-1">
           <div className="flex items-center gap-3">
@@ -131,6 +179,12 @@ export default function AccountUser({ initialSession = null }) {
           {user?.updated_at && (
             <p className="text-xs text-gray-400 mt-1">แก้ไขล่าสุด: <span className="text-gray-200">{formatDate(user.updated_at)}</span></p>
           )}
+
+          {/* CREDITS */}
+          <div className="mt-2 flex items-center gap-2">
+            <div className="text-sm text-gray-400">เครดิต:</div>
+            <div className="text-lg font-semibold text-white">฿{creditsLabel}</div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-2">

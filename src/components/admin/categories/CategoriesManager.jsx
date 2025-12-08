@@ -124,7 +124,7 @@ export default function CategoriesManager({
       const fd = new FormData();
       fd.append('file', file, file.name); // ส่งไฟล์เป็น multipart/form-data ไปยัง /api/upload
 
-      const res = await fetch('/api/upload', {
+      const res = await fetch('/api/admin/upload', {
         method: 'POST',
         body: fd,
         // อย่าใส่ Content-Type เอง — browser จะใส่ boundary ให้

@@ -1,6 +1,6 @@
 // app/account/page.jsx
 import React from 'react';
-import AccountPanel from '@/components/AccountUser';
+import ProfileUser from '@/components/web/ProfileUser';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
@@ -11,7 +11,7 @@ export default async function Page() {
   return (
     <div className="min-h-screen bg-gray-950 p-8">
       <div className="max-w-3xl mx-auto">
-        <AccountPanel initialSession={session ?? null} />
+        <ProfileUser initialSession={session ?? null} />
       </div>
     </div>
   );

@@ -12,7 +12,7 @@ export default async function OtherPagesLayout({ children }) {
   if (!session) {
     // ถ้าต้องการให้กลับมาที่ path ปัจจุบันหลัง login:
     // redirect(`/login?callbackUrl=${encodeURIComponent('/')}`); // ตัวอย่าง (แก้ '/' เป็น path จริงได้)
-    redirect('/login?error=unauthenticated');
+    redirect('/login');
   }
 
   // ถ้ามี session ให้เรนเดอร์ layout ตามปกติ

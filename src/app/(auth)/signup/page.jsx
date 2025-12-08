@@ -10,7 +10,7 @@ export default function SignupPage() {
           <p className="text-gray-400 mt-2">สร้างบัญชีเพื่อซื้อเกมและจัดการโปรไฟล์ของคุณ</p>
         </div>
 
-        <SignupForm redirectTo="/account" />
+        <SignupForm redirectTo="/profile" />
       </div>
     </main>
   );

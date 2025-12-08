@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 
-export default function LoginForm({ redirectTo = '/account' }) {
+export default function LoginForm({ redirectTo = '/profile' }) {
   const router = useRouter();
   const params = useSearchParams();
 
@@ -18,6 +18,7 @@ export default function LoginForm({ redirectTo = '/account' }) {
     not_google: 'อีเมลนี้ไม่ได้สมัครผ่าน Google — กรุณาเข้าสู่ระบบด้วยอีเมล/รหัสผ่าน',
     google_no_email: 'ไม่สามารถอ่านอีเมลจาก Google ได้ โปรดลองอีกครั้ง หรือใช้วิธีการเข้าสู่ระบบอื่น',
     Invalid_credentials: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
+    INACTIVE_ACCOUNT: 'บัญชีนี้ไม่สามารถใช้งานได้',
     // ถ้ามีข้อความอื่น ๆ ที่ NextAuth ส่งเป็น plain text เราจะแสดง decodeURIComponent
   };
 

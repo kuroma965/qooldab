@@ -10,7 +10,7 @@ export default function LoginPage() {
           <p className="text-gray-400 mt-2">เข้าสู่ระบบเพื่อจัดการบัญชีและซื้อเกม</p>
         </div>
 
-        <LoginForm redirectTo="/account" />
+        <LoginForm redirectTo="/profile" />
       </div>
     </main>
   );

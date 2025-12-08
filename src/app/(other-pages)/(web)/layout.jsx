@@ -5,7 +5,9 @@ export default function OtherPagesLayout({ children }) {
   return (
     <>
       <Navbar />
-      <main>{children}</main>
+      <main className='bg-gray-950'>
+        {children}
+      </main>
     </>
   );
 }

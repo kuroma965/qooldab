@@ -11,7 +11,6 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_ROUNDS ?? 10);
-const SECRET_SIGNUP_GOOGLE = process.env.SECRET_SIGNUP_GOOGLE || "";
 
 function formatCreditsRaw(val) {
   // DB numeric may come as string e.g. "12.50" — normalize to "00.00" style string
@@ -24,7 +23,13 @@ function formatCreditsRaw(val) {
   }
 }
 
-async function createUser({ email, passwordHash, name, sign_up = "credentials", image = null }) {
+async function createUser({
+  email,
+  passwordHash,
+  name,
+  sign_up = "credentials",
+  image = null,
+}) {
   const insertObj = {
     email,
     password_hash: passwordHash,
@@ -33,13 +38,18 @@ async function createUser({ email, passwordHash, name, sign_up = "credentials", 
     image: image ?? null,
     created_at: new Date(),
     updated_at: new Date(),
+    // สมมติว่าคอลัมน์ is_active มี default ที่ DB เป็น true อยู่แล้ว
   };
   try {
     const res = await db.insert(users).values(insertObj).returning();
     if (res && res[0]) return res[0];
     // fallback for drivers that don't return
     await db.insert(users).values(insertObj).run();
-    const r = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const r = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
     return r[0];
   } catch (err) {
     throw err;
@@ -53,9 +63,19 @@ async function createUser({ email, passwordHash, name, sign_up = "credentials", 
  */
 async function ensureUserForGoogle(email, name, picture = null) {
   const normalized = String(email).trim().toLowerCase();
-  const rows = await db.select().from(users).where(eq(users.email, normalized)).limit(1);
+  const rows = await db
+    .select()
+    .from(users)
+    .where(eq(users.email, normalized))
+    .limit(1);
   if (rows.length) {
     const existing = rows[0];
+
+    // NEW: ถ้า user ถูกปิดการใช้งาน ห้าม login ด้วย Google
+    if (existing.is_active === false) {
+      throw new Error("INACTIVE_ACCOUNT");
+    }
+
     // If user exists but was NOT created via google, block sign-in via google
     if (existing.sign_up && String(existing.sign_up).toLowerCase() !== "google") {
       // Throw an error with a clear message we can check in signIn
@@ -63,8 +83,6 @@ async function ensureUserForGoogle(email, name, picture = null) {
     }
     return existing;
   }
-
-  if (!SECRET_SIGNUP_GOOGLE) throw new Error("SECRET_SIGNUP_GOOGLE not configured");
 
   // create user with null password (google signups)
   const created = await createUser({
@@ -85,8 +103,8 @@ export const authOptions = {
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" },
-        name: { label: "Name", type: "text" },       // optional for signup
-        action: { label: "action", type: "text" },   // 'signup' or undefined
+        name: { label: "Name", type: "text" }, // optional for signup
+        action: { label: "action", type: "text" }, // 'signup' or undefined
       },
       /**
        * authorize runs for both login and signup (depending on credentials.action)
@@ -102,7 +120,11 @@ export const authOptions = {
           const isSignup = action === "signup" || action === "register";
 
           // check existing user
-          const rows = await db.select().from(users).where(eq(users.email, email)).limit(1);
+          const rows = await db
+            .select()
+            .from(users)
+            .where(eq(users.email, email))
+            .limit(1);
           const existing = rows[0];
 
           if (isSignup) {
@@ -113,12 +135,15 @@ export const authOptions = {
             if (!credentials?.password || String(credentials.password).length < 8) {
               throw new Error("Password required (min 8 chars)");
             }
-            const hashed = await bcrypt.hash(String(credentials.password), BCRYPT_ROUNDS);
+            const hashed = await bcrypt.hash(
+              String(credentials.password),
+              BCRYPT_ROUNDS
+            );
             const created = await createUser({
               email,
               passwordHash: hashed,
               name: credentials.name ?? null,
-              sign_up: "credentials",
+              sign_up: "qooldab",
             });
             if (!created) throw new Error("Failed to create user");
 
@@ -128,7 +153,9 @@ export const authOptions = {
               email: created.email,
               role: created.role ?? "user",
               image: created.image ?? null,
-              updated_at: created.updated_at ? new Date(created.updated_at).toISOString() : undefined,
+              updated_at: created.updated_at
+                ? new Date(created.updated_at).toISOString()
+                : undefined,
               credits: formatCreditsRaw(created.credits), // <- add credits
             };
           } else {
@@ -137,16 +164,30 @@ export const authOptions = {
               throw new Error("Invalid_credentials");
             }
 
+            // NEW: ถ้า user ถูกปิดการใช้งาน ไม่ให้ล็อกอิน
+            if (existing.is_active === false) {
+              // ข้อความนี้จะถูกส่งไปที่ /login?error=INACTIVE_ACCOUNT (ถ้า config หน้า error รับได้)
+              throw new Error("INACTIVE_ACCOUNT");
+            }
+
             // If this account was created via Google, tell the user to use Google sign-in
-            if (existing.sign_up && String(existing.sign_up).toLowerCase() === "google") {
+            if (
+              existing.sign_up &&
+              String(existing.sign_up).toLowerCase() === "google"
+            ) {
               // throw with friendly message (NextAuth will send it to pages.error if configured)
-              throw new Error("อีเมลนี้สมัครผ่าน Google กรุณาเข้าสู่ระบบด้วย Google");
+              throw new Error(
+                "อีเมลนี้สมัครผ่าน Google กรุณาเข้าสู่ระบบด้วย Google"
+              );
             }
 
             if (!credentials?.password) {
               throw new Error("Password required");
             }
-            const ok = await bcrypt.compare(String(credentials.password), existing.password_hash);
+            const ok = await bcrypt.compare(
+              String(credentials.password),
+              existing.password_hash
+            );
             if (!ok) throw new Error("Invalid_credentials");
 
             return {
@@ -155,7 +196,9 @@ export const authOptions = {
               email: existing.email,
               role: existing.role ?? "user",
               image: existing.image ?? null,
-              updated_at: existing.updated_at ? new Date(existing.updated_at).toISOString() : undefined,
+              updated_at: existing.updated_at
+                ? new Date(existing.updated_at).toISOString()
+                : undefined,
               credits: formatCreditsRaw(existing.credits), // <- add credits
             };
           }
@@ -174,8 +217,8 @@ export const authOptions = {
 
   // Put pages at top-level so NextAuth knows where to redirect on errors
   pages: {
-    signIn: '/login',
-    error: '/login', // NextAuth will redirect to /login?error=... when we return a URL or throw
+    signIn: "/login",
+    error: "/login", // NextAuth will redirect to /login?error=... when we return a URL or throw
   },
 
   // Use JWT sessions (stateless). NextAuth stores session in signed cookie.
@@ -192,10 +235,20 @@ export const authOptions = {
             return `/login?error=${encodeURIComponent("google_no_email")}`;
           }
 
-          // Try to ensure the DB user exists. ensureUserForGoogle throws "NOT_GOOGLE_SIGNUP"
-          // if there is an existing non-google signup (we handle that below)
+          // Try to ensure the DB user exists. ensureUserForGoogle throws:
+          // - "NOT_GOOGLE_SIGNUP" ถ้ามี user เดิมแต่สมัครด้วยวิธีอื่น
+          // - "INACTIVE_ACCOUNT" ถ้า user ถูกปิดการใช้งาน
           try {
-            const dbUser = await ensureUserForGoogle(googleEmail, profile?.name ?? user?.name, profile?.picture ?? null);
+            const dbUser = await ensureUserForGoogle(
+              googleEmail,
+              profile?.name ?? user?.name,
+              profile?.picture ?? null
+            );
+
+            // (กัน double-check ไว้ด้วย เผื่อมีใช้ ensureUserForGoogle ที่อื่น)
+            if (dbUser.is_active === false) {
+              return `/login?error=${encodeURIComponent("inactive")}`;
+            }
 
             // success: attach DB values (prefer DB)
             user.id = String(dbUser.id);
@@ -203,17 +256,25 @@ export const authOptions = {
             user.email = dbUser.email;
             user.role = dbUser.role ?? "user";
             user.image = profile?.picture ?? null;
-            user.updated_at = dbUser.updated_at ? new Date(dbUser.updated_at).toISOString() : undefined;
+            user.updated_at = dbUser.updated_at
+              ? new Date(dbUser.updated_at).toISOString()
+              : undefined;
             user.credits = formatCreditsRaw(dbUser.credits); // <- add credits
 
             return true; // allow sign in
           } catch (err) {
-            // handle the NOT_GOOGLE_SIGNUP case gracefully by redirecting to /login with our own code
             const msg = String(err?.message ?? "");
+
             if (msg === "NOT_GOOGLE_SIGNUP") {
               // redirect user to login page with friendly error code
               return `/login?error=${encodeURIComponent("not_google")}`;
             }
+
+            if (msg === "INACTIVE_ACCOUNT") {
+              // redirect ด้วย error code inactive
+              return `/login?error=${encodeURIComponent("inactive")}`;
+            }
+
             // other errors -> surface as generic nextauth error (will go to pages.error)
             console.error("ensureUserForGoogle error:", err);
             throw err;
@@ -265,16 +326,22 @@ export const authOptions = {
       try {
         if (token?.id) {
           const uid = Number(token.id);
-          const rows = await db.select().from(users).where(eq(users.id, uid)).limit(1);
+          const rows = await db
+            .select()
+            .from(users)
+            .where(eq(users.id, uid))
+            .limit(1);
           const dbUser = rows[0] ?? null;
           if (dbUser) {
             session.user.name = dbUser.name ?? session.user.name;
             session.user.email = dbUser.email ?? session.user.email;
-            if (Object.prototype.hasOwnProperty.call(dbUser, 'image')) {
+            if (Object.prototype.hasOwnProperty.call(dbUser, "image")) {
               session.user.image = dbUser.image ?? null;
             }
             session.user.role = dbUser.role ?? session.user.role;
-            session.user.updated_at = dbUser.updated_at ? new Date(dbUser.updated_at).toISOString() : session.user.updated_at;
+            session.user.updated_at = dbUser.updated_at
+              ? new Date(dbUser.updated_at).toISOString()
+              : session.user.updated_at;
 
             // update credits from DB (ensure formatted)
             session.user.credits = formatCreditsRaw(dbUser.credits);

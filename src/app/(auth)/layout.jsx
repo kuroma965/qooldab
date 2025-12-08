@@ -5,7 +5,11 @@ export default function OtherPagesLayout({ children }) {
   return (
     <>
       <Navbar />
-      <main>{children}</main>
+      <main>
+        <div className='py-[-200px]'>
+          {children}
+        </div>
+      </main>
     </>
   );
 }

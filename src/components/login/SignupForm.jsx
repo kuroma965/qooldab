@@ -8,7 +8,7 @@ import Link from 'next/link';
  *  - redirectTo: path to redirect after success
  *  - loadingMode: 'button' | 'page'  (default 'button')
  */
-export default function SignupForm({ redirectTo = '/account', loadingMode = 'button' }) {
+export default function SignupForm({ redirectTo = '/profile', loadingMode = 'button' }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');

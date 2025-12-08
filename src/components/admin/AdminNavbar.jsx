@@ -92,7 +92,7 @@ export default function AdminNavbar() {
             </Link>
 
             <Link href="/admin/promotions" className={linkClass(pathname.startsWith('/admin/promotions'))}>
-              จัดการโปรโมชั่น
+              จัดการโปรแกรม
             </Link>
 
             {/* ปุ่มกลับไปหน้าเว็บไซต์ — เป็นภาษาอังกฤษตามคำขอ */}
@@ -127,10 +127,10 @@ export default function AdminNavbar() {
                   {isUserMenuOpen && (
                     <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
                       <div className="py-1">
-                        <Link href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           ดูโปรไฟล์
                         </Link>
-                        <Link href="/account/history" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                        <Link href="/profile/history" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                           ประวัติการสั่งซื้อ
                         </Link>
                         {isAdmin && (
@@ -180,8 +180,8 @@ export default function AdminNavbar() {
 
             {isAuthenticated && (
               <>
-                <Link href="/account" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">บัญชีของฉัน</Link>
-                <Link href="/account/history" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">ประวัติการสั่งซื้อ</Link>
+                <Link href="/profile" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">บัญชีของฉัน</Link>
+                <Link href="/profile/history" className="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:bg-purple-800 hover:text-white">ประวัติการสั่งซื้อ</Link>
                 <button onClick={logout} className="w-full text-left block px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-purple-800 hover:text-white">ออกจากระบบ</button>
               </>
             )}

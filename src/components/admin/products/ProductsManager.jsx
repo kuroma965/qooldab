@@ -114,7 +114,7 @@ export default function ProductsManager({
       setMessage('กำลังอัพโหลดรูป...');
       const fd = new FormData();
       fd.append('file', file, file.name);
-      const res = await fetch('/api/upload', { method: 'POST', body: fd });
+      const res = await fetch('/api/admin/upload', { method: 'POST', body: fd });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(json?.error || `Upload failed (${res.status})`);
       const img = json?.image;

@@ -43,6 +43,13 @@
       "when": 1764506549256,
       "tag": "0005_black_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765046810072,
+      "tag": "0006_charming_ghost_rider",
+      "breakpoints": true
     }
   ]
 }
