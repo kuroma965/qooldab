@@ -1,4 +1,4 @@
-// app/api/categories/route.js
+// app/api/admin/categories/route.js
 import { NextResponse } from 'next/server';
 import { db } from '@/db/db';
 import { categories } from '@/db/schema';
