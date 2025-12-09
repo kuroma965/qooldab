@@ -88,21 +88,24 @@ export default function ProductsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-950 min-h-screen">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-1">สินค้าทั้งหมด</h1>
-          <p className="text-gray-400">All products</p>
+      <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6">
+        {/* ซ้าย: Title */}
+        <div className="space-y-1">
+          <h1 className="text-2xl md:text-3xl font-bold text-white">สินค้าทั้งหมด</h1>
+          <p className="text-gray-400 text-sm md:text-base">All products</p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* ขวา: search + refresh (มือถือซ้อนเป็นสองแถว, จอใหญ่เรียงขวาง) */}
+        <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           <input
             type="search"
             placeholder="ค้นหาสินค้า..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
+            className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
             aria-label="ค้นหาสินค้า"
           />
+
           <button
             onClick={async () => {
               setLoading(true);
@@ -110,10 +113,14 @@ export default function ProductsPage() {
               try {
                 const res = await fetchProducts({}, { ensureCategories: true });
                 const all = res.items ?? [];
-                // reapply isPopular marking
-                const sorted = [...all].sort((a, b) => (Number(b.sold || 0) - Number(a.sold || 0)));
+                const sorted = [...all].sort(
+                  (a, b) => Number(b.sold || 0) - Number(a.sold || 0)
+                );
                 const topIds = new Set(sorted.slice(0, 4).map((p) => Number(p.id)));
-                const enriched = (all || []).map((p) => ({ ...p, isPopular: topIds.has(Number(p.id)) }));
+                const enriched = (all || []).map((p) => ({
+                  ...p,
+                  isPopular: topIds.has(Number(p.id)),
+                }));
                 setItems(enriched);
                 setQ('');
               } catch (err) {
@@ -123,9 +130,16 @@ export default function ProductsPage() {
                 setLoading(false);
               }
             }}
-            className="inline-flex items-center px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-sm hover:bg-gray-800/90"
+            className="inline-flex justify-center items-center px-3 py-2 bg-gray-800 rounded-lg border border-gray-700 text-sm hover:bg-gray-800/90 w-full sm:w-auto transition"
           >
-            <svg className='w-5 h-5 mr-1' fill="#ffffff" viewBox="0 0 24.00 24.00" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier"></g><g id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"> <path d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"></path> </g></svg>
+            <svg
+              className="w-5 h-5 mr-1"
+              fill="#ffffff"
+              viewBox="0 0 24 24"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z" />
+            </svg>
             รีเฟรช
           </button>
         </div>

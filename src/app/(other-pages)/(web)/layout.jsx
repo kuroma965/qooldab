@@ -1,5 +1,6 @@
 // app/(other-pages)/layout.js
-import Navbar from '@/components/common/Navbar';
+import Navbar from '@/components/layout/Navbar';
+import FooterCopyright from '@/components/layout/FooterCopyright';
 
 export default function OtherPagesLayout({ children }) {
   return (
@@ -7,6 +8,7 @@ export default function OtherPagesLayout({ children }) {
       <Navbar />
       <main className='bg-gray-950'>
         {children}
+        <FooterCopyright />
       </main>
     </>
   );

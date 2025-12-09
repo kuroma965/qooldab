@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { fetchProducts, getCategoriesList } from '@/lib/Cats-Prod-Db';
 import ProductCard from '@/components/common/ProductCard';
-import { ArrowRight } from 'lucide-react'; // 1. Import Lucide Icon
+import { ArrowRight } from 'lucide-react';
 
 const NEW_MS = 15 * 24 * 60 * 60 * 1000; // 15 days
 
@@ -121,12 +121,12 @@ export default function GameShop() {
                 >
                     <div className="relative h-full w-full bg-gray-800 rounded-xl overflow-hidden">
                         {/* 4. objectFit='cover' จะทำให้รูปเต็มพื้นที่โดยไม่เสียสัดส่วน (แต่จะ crop ส่วนเกินออก) */}
-                        <Image 
-                            src={img} 
-                            alt={name} 
-                            fill 
-                            style={{ objectFit: 'cover' }} 
-                            unoptimized 
+                        <Image
+                            src={img}
+                            alt={name}
+                            fill
+                            style={{ objectFit: 'cover' }}
+                            unoptimized
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
                         <div className="absolute left-4 bottom-4 text-left">
@@ -142,9 +142,29 @@ export default function GameShop() {
     // --- render ---
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-950 min-h-screen">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-white mb-1">ร้าน qooldab</h1>
-                <p className="text-gray-400">ค้นพบสินค้าออนไลน์ยอดนิยม ROV Freefire PUBG Roblox และอื่นๆอีกมากมาย</p>
+            <div className="relative mb-12 px-2">
+                {/* แสง Glow จางๆ ด้านหลัง เพื่อให้ตัวหนังสือดูไม่แห้งเกินไป */}
+                <div className="absolute left-45 -top-10 w-48 h-48 bg-purple-500/20 blur-[80px] rounded-full pointer-events-none" />
+
+                <div className="relative">
+                    <h1 className="text-4xl md:text-5xl font-black text-white mb-3 tracking-tight">
+                        <span className="mr-3 bg-gradient-to-r from-purple-400 via-fuchsia-300 to-indigo-400 bg-clip-text text-transparent drop-shadow-[0_0_20px_rgba(168,85,247,0.4)]">
+                            Qooldab
+                        </span>
+                        Store
+                    </h1>
+
+                    <p className="text-lg text-gray-400 font-light leading-relaxed max-w-2xl">
+                        ค้นพบสินค้าออนไลน์ยอดนิยม
+                        <span className="mx-2 font-medium text-purple-200">
+                            ROV · Freefire · PUBG · Roblox
+                        </span>
+                        และอื่นๆ อีกมากมาย
+                    </p>
+
+                    {/* เส้นตกแต่งไล่สีสั้นๆ ด้านล่าง */}
+                    <div className="mt-5 h-1.5 w-70 md:w-160 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-full shadow-[0_0_10px_rgba(168,85,247,0.5)]" />
+                </div>
             </div>
 
             {/* Categories */}

@@ -1,10 +1,23 @@
 // components/ProfileUser.jsx
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import { signOut, getSession } from 'next-auth/react';
+import {
+  User2,
+  LogOut,
+  Pencil,
+  CheckCircle2,
+  AlertCircle,
+  CreditCard,
+  Mail,
+  IdCard,
+  Clock,
+} from 'lucide-react';
+
+import ModalDialog from '../common/ModalDialog';
 
 export default function ProfileUser({ initialSession = null }) {
-  // Use only session passed from server (initialSession)
   const session = initialSession ?? null;
   const initialUser = session?.user ?? null;
 
@@ -15,10 +28,8 @@ export default function ProfileUser({ initialSession = null }) {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // track if profile image failed to load
   const [imageErrored, setImageErrored] = useState(false);
 
-  // sync when initialSession changes (server -> client hydration)
   useEffect(() => {
     setUser(initialUser);
     setName(initialUser?.name ?? '');
@@ -35,7 +46,6 @@ export default function ProfileUser({ initialSession = null }) {
     }
   };
 
-  // Format credits with commas and always show 2 decimal places
   const formatCredits = (val) => {
     const n = Number(val ?? 0);
     if (!Number.isFinite(n)) return String(val ?? 0);
@@ -45,13 +55,18 @@ export default function ProfileUser({ initialSession = null }) {
     }).format(n);
   };
 
-  // helper to pick credits field from several possible names and coerce to Number when possible
   const getUserCredits = (u) => {
     if (!u) return 0;
-    const candidates = ['credits', 'credit', 'balance', 'wallet', 'wallet_balance', 'points'];
+    const candidates = [
+      'credits',
+      'credit',
+      'balance',
+      'wallet',
+      'wallet_balance',
+      'points',
+    ];
     for (const key of candidates) {
       if (u[key] != null) {
-        // try to coerce numeric-looking strings into Number
         const val = u[key];
         const num = Number(val);
         return Number.isFinite(num) ? num : val;
@@ -68,8 +83,6 @@ export default function ProfileUser({ initialSession = null }) {
 
     try {
       const payload = { name: name?.trim() };
-
-      // include image only if the initial session had one
       const sessionImage = initialUser?.image;
       if (sessionImage && String(sessionImage).trim() !== '') {
         payload.image = String(sessionImage).trim();
@@ -84,13 +97,11 @@ export default function ProfileUser({ initialSession = null }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || 'Failed to update');
 
-      // API returns updated user object (safe fields). Update local UI immediately.
       setUser(data.user);
       setName(data.user?.name ?? '');
       setEditing(false);
       setSuccessMsg('บันทึกเรียบร้อย');
 
-      // Refresh NextAuth client session so other parts of app reflect latest DB values.
       try {
         const fresh = await getSession();
         if (fresh?.user) {
@@ -102,10 +113,12 @@ export default function ProfileUser({ initialSession = null }) {
           setName(fresh.user?.name ?? data.user?.name ?? '');
         }
       } catch (err) {
-        console.warn('Failed to refresh client session after profile update', err);
+        console.warn(
+          'Failed to refresh client session after profile update',
+          err
+        );
       }
 
-      // clear message after short time
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       console.error(err);
@@ -120,111 +133,225 @@ export default function ProfileUser({ initialSession = null }) {
     setSuccessMsg('');
     setError('');
   }
+
   function closeEdit() {
     setEditing(false);
     setName(user?.name ?? '');
     setError('');
   }
 
-  // Image element: show <img> if user.image exists and didn't error,
-  // otherwise show fallback SVG avatar.
   const renderAvatar = () => {
     const src = user?.image ? String(user.image).trim() : '';
     if (src && !imageErrored) {
-      // use <img> (not next/image) so we can reliably catch onError client-side.
       return (
         // eslint-disable-next-line jsx-a11y/img-redundant-alt
         <img
           src={src}
           alt="avatar"
-          className="w-24 h-24 rounded-full object-cover border-2 border-purple-700"
+          className="w-24 h-24 rounded-full object-cover border-2 border-purple-400 shadow-lg"
           onError={() => setImageErrored(true)}
         />
       );
     }
 
-    // fallback icon
     return (
-      <div className="w-24 h-24 rounded-full bg-gray-700 flex items-center justify-center text-gray-300 border-2 border-purple-700">
-        <svg className="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" aria-hidden>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" />
-          <circle cx="12" cy="7" r="4" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" />
-        </svg>
+      <div className="w-24 h-24 rounded-full bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center border-2 border-purple-300 shadow-lg">
+        <User2 className="w-12 h-12 text-white" />
       </div>
     );
   };
 
-  // get credits and force numeric formatting
   const rawCredits = getUserCredits(user);
-  // if rawCredits is numeric (Number) or numeric-string coerced earlier, format; else show as-is
-  const creditsLabel = Number.isFinite(Number(rawCredits)) ? formatCredits(Number(rawCredits)) : String(rawCredits ?? '');
+  const creditsLabel = Number.isFinite(Number(rawCredits))
+    ? formatCredits(Number(rawCredits))
+    : String(rawCredits ?? '');
 
   return (
-    <div className="bg-gray-800 rounded-xl p-6 shadow-md border border-purple-800">
-      <h1 className="text-2xl font-bold text-white mb-4">บัญชีของฉัน</h1>
+    <div className="bg-transparent">
+      {/* Header */}
+      <div className="mb-4">
+        <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center gap-2">
+          <User2 className="w-6 h-6 text-purple-300" />
+          บัญชีของฉัน
+        </h1>
+        <p className="text-sm text-gray-400 mt-1">
+          ดูข้อมูลผู้ใช้และเครดิตของคุณ ปรับแต่งโปรไฟล์ได้ที่นี่
+        </p>
+      </div>
 
-      {error && <div className="mb-3 text-sm text-red-300">{error}</div>}
-
-      <div className="flex gap-6 items-center">
-        <div>{renderAvatar()}</div>
-
-        <div className="flex-1">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-semibold text-white">{user?.name ?? 'ไม่มีชื่อ'}</h2>
-            <span className="text-xs px-2 py-1 bg-gray-700 text-gray-200 rounded">{user?.role ?? 'user'}</span>
+      {/* Alerts */}
+      <div className="space-y-2 mb-4">
+        {error && (
+          <div className="flex items-center gap-2 text-sm text-red-300 bg-red-900/25 border border-red-700/70 rounded-xl px-3 py-2">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
           </div>
-          <p className="text-sm text-gray-300 mt-1">{user?.email}</p>
-          <p className="text-xs text-gray-400 mt-2">id: {user?.id}</p>
-          {/* show updated_at from session or API response */}
-          {user?.updated_at && (
-            <p className="text-xs text-gray-400 mt-1">แก้ไขล่าสุด: <span className="text-gray-200">{formatDate(user.updated_at)}</span></p>
-          )}
-
-          {/* CREDITS */}
-          <div className="mt-2 flex items-center gap-2">
-            <div className="text-sm text-gray-400">เครดิต:</div>
-            <div className="text-lg font-semibold text-white">฿{creditsLabel}</div>
+        )}
+        {successMsg && (
+          <div className="flex items-center gap-2 text-sm text-green-300 bg-green-900/20 border border-green-700/60 rounded-xl px-3 py-2">
+            <CheckCircle2 className="w-4 h-4" />
+            <span>{successMsg}</span>
           </div>
-        </div>
+        )}
+      </div>
 
-        <div className="flex flex-col gap-2">
-          <button onClick={openEdit} className="px-4 py-2 bg-purple-600 text-white rounded hover:opacity-90">
-            แก้ไขชื่อ
-          </button>
-          <button onClick={() => signOut({ callbackUrl: '/' })} className="px-4 py-2 border border-gray-700 rounded text-gray-200 hover:bg-gray-900">
-            ออกจากระบบ
-          </button>
+      {/* Main card */}
+      <div className="bg-gray-900/90 rounded-2xl border border-purple-800/70 shadow-2xl overflow-hidden">
+        <div className="flex flex-col md:flex-row">
+          {/* LEFT: Profile panel */}
+          <aside className="md:w-72 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 border-b md:border-b-0 md:border-r border-purple-800/50 p-5 sm:p-6 flex flex-col items-center text-center gap-4">
+            <div className="flex flex-col items-center gap-3">
+              {renderAvatar()}
+
+              <div className="space-y-1">
+                <div className="flex items-center justify-center gap-2">
+                  <span className="text-lg font-semibold text-white truncate max-w-[180px]">
+                    {user?.name ?? 'ไม่มีชื่อ'}
+                  </span>
+                </div>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-gray-800 text-[11px] uppercase tracking-wide text-gray-200 border border-gray-700">
+                  {user?.role ?? 'user'}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center gap-1 text-xs text-gray-400">
+                <div className="inline-flex items-center gap-1">
+                  <IdCard className="w-3 h-3" />
+                  <span>ID: {user?.id ?? '-'}</span>
+                </div>
+                {user?.updated_at && (
+                  <div className="inline-flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    <span>อัปเดต: {formatDate(user.updated_at)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="mt-4 w-full flex flex-col gap-2">
+              <button
+                onClick={openEdit}
+                className="inline-flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-medium hover:bg-purple-500 transition-colors"
+              >
+                <Pencil className="w-4 h-4" />
+                แก้ไขชื่อโปรไฟล์
+              </button>
+              <button
+                onClick={() => signOut({ callbackUrl: '/' })}
+                className="inline-flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-xl border border-gray-700 text-sm font-medium text-gray-200 hover:bg-gray-900 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                ออกจากระบบ
+              </button>
+            </div>
+          </aside>
+
+          {/* RIGHT: Details */}
+          <main className="flex-1 p-5 sm:p-6 md:p-7 space-y-5">
+            {/* Credits card */}
+            <section className="bg-gradient-to-r from-purple-900/70 via-purple-800/60 to-indigo-800/60 rounded-2xl border border-purple-500/70 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-inner">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-black/20 flex items-center justify-center border border-purple-200/40">
+                  <CreditCard className="w-5 h-5 text-purple-50" />
+                </div>
+                <div>
+                  <div className="text-xs uppercase text-purple-100/80 tracking-wide">
+                    Credits Balance
+                  </div>
+                  <div className="text-2xl font-semibold text-white mt-0.5">
+                    ฿{creditsLabel}
+                  </div>
+                  <div className="text-xs text-purple-100/80 mt-1">
+                    ใช้สำหรับซื้อสินค้า / บริการบน qooldab
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Info list */}
+            <section className="bg-gray-900/80 rounded-2xl border border-gray-800 p-4 sm:p-5 space-y-3">
+              <h2 className="text-sm font-semibold text-gray-100 mb-1">
+                ข้อมูลผู้ใช้
+              </h2>
+
+              <div className="space-y-3 text-sm">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-300">อีเมล</span>
+                  </div>
+                  <div className="text-gray-100 break-all">
+                    {user?.email ?? '-'}
+                  </div>
+                </div>
+
+                <div className="h-px bg-gray-800/60" />
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+                  <div className="flex items-center gap-2 text-gray-400">
+                    <User2 className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-300">ชื่อที่แสดง</span>
+                  </div>
+                  <div className="text-gray-100">
+                    {user?.name ?? 'ไม่มีชื่อ'}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </main>
         </div>
       </div>
 
-      {successMsg && <div className="mt-4 text-sm text-green-300">{successMsg}</div>}
-
-      {/* Modal edit (name only) */}
-      {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={closeEdit} />
-          <form onSubmit={handleSave} className="relative bg-gray-900 w-full max-w-md rounded-lg p-6 z-10 border border-purple-800">
-            <h3 className="text-lg font-semibold text-white mb-2">แก้ไขชื่อ</h3>
-
-            <label className="text-sm text-gray-300">ชื่อ</label>
+      {/* ✅ ใช้ common ModalDialog แทน modal ที่เขียนเอง */}
+      <ModalDialog
+        open={editing}
+        onClose={closeEdit}
+        title="แก้ไขชื่อโปรไฟล์"
+        icon={<Pencil className="w-5 h-5 text-purple-300" />}
+        size="md"
+      >
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="text-sm text-gray-300">
+              ชื่อที่ต้องการให้แสดง
+            </label>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full mt-1 mb-3 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white"
+              className="w-full mt-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-600"
               maxLength={100}
             />
+          </div>
 
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={closeEdit} className="px-4 py-2 rounded border border-gray-700 text-gray-200">
-                ยกเลิก
-              </button>
-              <button type="submit" disabled={saving} className={`px-4 py-2 rounded ${saving ? 'bg-gray-600 text-gray-300' : 'bg-purple-600 text-white'}`}>
-                {saving ? 'กำลังบันทึก...' : 'บันทึก'}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={closeEdit}
+              className="px-4 py-2 rounded-lg border border-gray-700 text-gray-200 text-sm hover:bg-gray-900 transition-colors"
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className={`px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${saving
+                  ? 'bg-gray-600 text-gray-300 cursor-not-allowed'
+                  : 'bg-purple-600 text-white hover:bg-purple-500'
+                }`}
+            >
+              {saving ? (
+                <>
+                  <span className="inline-block w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  กำลังบันทึก...
+                </>
+              ) : (
+                'บันทึก'
+              )}
+            </button>
+          </div>
+        </form>
+      </ModalDialog>
     </div>
   );
 }

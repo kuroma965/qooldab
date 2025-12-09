@@ -8,7 +8,7 @@ import { getCategoriesList } from '@/lib/Cats-Prod-Db';
 const PLACEHOLDER_IMG = 'https://images.unsplash.com/photo-1511512578047-d6360b94f7fb?auto=format&fit=crop&w=1200&q=80';
 
 const CategorySkeleton = () => (
-  <div className="relative group w-full overflow-hidden rounded-xl h-44 animate-pulse">
+  <div className="relative group w-full overflow-hidden rounded-xl aspect-[3.3/1] animate-pulse">
     <div className="h-full w-full bg-gray-800 rounded-xl" />
     <div className="absolute left-4 bottom-4">
       <div className="h-8 bg-gray-700 rounded w-32 mb-2" />
@@ -32,15 +32,27 @@ function CategoryCard({ category, index, onOpen }) {
     >
       <button
         onClick={() => onOpen(slug)}
-        className="relative group w-full h-44 rounded-xl overflow-hidden shadow-sm bg-gray-800 hover:scale-103 transform transition-transform duration-200"
+        className="relative group w-full aspect-[3.3/1] rounded-xl overflow-hidden shadow-sm bg-gray-800 hover:scale-103 transform transition-transform duration-200"
         aria-label={`Open category ${name}`}
       >
         <div className="relative h-full w-full">
-          <Image src={img} alt={name} fill style={{ objectFit: 'cover' }} unoptimized />
+          <Image
+            src={img}
+            alt={name}
+            fill
+            style={{ objectFit: 'cover' }} // ไม่บี้รูป แค่ครอปส่วนเกิน
+            unoptimized
+          />
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
           <div className="absolute left-4 bottom-4">
-            <div className="text-white text-lg font-extrabold drop-shadow-md line-clamp-1 text-start">{name}</div>
-            {category.description && <div className="text-xs text-gray-300 mt-1 max-w-xs line-clamp-1">{category.description}</div>}
+            <div className="text-white text-lg font-extrabold drop-shadow-md line-clamp-1 text-start">
+              {name}
+            </div>
+            {category.description && (
+              <div className="text-xs text-gray-300 mt-1 max-w-xs line-clamp-1">
+                {category.description}
+              </div>
+            )}
           </div>
           <div className="absolute inset-0 bg-transparent group-hover:bg-purple-600/10 transition-colors duration-200" />
         </div>
@@ -103,33 +115,43 @@ export default function CategoriesPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 bg-gray-950 min-h-screen">
-      <div className="flex items-center justify-between mb-6 gap-4">
-        <div>
-          <h1 className="text-3xl font-bold text-white">หมวดหมู่ทั้งหมด</h1>
-          <p className="text-gray-400 mt-1">All categories</p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-6 mb-6">
+  {/* ซ้าย: Title */}
+  <div className="space-y-1">
+    <h1 className="text-2xl md:text-3xl font-bold text-white">หมวดหมู่ทั้งหมด</h1>
+    <p className="text-gray-400 text-sm md:text-base">All categories</p>
+  </div>
 
-        <div className="flex items-center gap-2">
-          <input
-            type="search"
-            placeholder="ค้นหาหมวดหมู่..."
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
-            aria-label="ค้นหาหมวดหมู่"
-          />
+  {/* ขวา: search + refresh (มือถือจะซ้อนเป็นสองแถว) */}
+  <div className="w-full md:w-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+    <input
+      type="search"
+      placeholder="ค้นหาหมวดหมู่..."
+      value={filter}
+      onChange={(e) => setFilter(e.target.value)}
+      className="flex-1 min-w-0 px-3 py-2 rounded-lg bg-gray-800 text-white text-sm border border-gray-700 focus:outline-none focus:ring-2 focus:ring-purple-600"
+      aria-label="ค้นหาหมวดหมู่"
+    />
 
-          <button
-            onClick={() => loadCategories({ forceReload: true })}
-            title="Refresh categories"
-            className="inline-flex items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-sm rounded-lg hover:bg-gray-800/90 transition"
-            aria-label="รีเฟรชหมวดหมู่"
-          >
-            <svg className='w-5 h-5' fill="#ffffff" viewBox="0 0 24.00 24.00" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier"></g><g id="SVGRepo_tracerCarrier"></g><g id="SVGRepo_iconCarrier"> <path d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"></path> </g></svg>
-             รีเฟรช
-          </button>
-        </div>
-      </div>
+    <button
+      onClick={() => loadCategories({ forceReload: true })}
+      title="Refresh categories"
+      className="inline-flex justify-center items-center gap-2 px-3 py-2 bg-gray-800 border border-gray-700 text-sm rounded-lg hover:bg-gray-800/90 transition w-full sm:w-auto"
+      aria-label="รีเฟรชหมวดหมู่"
+    >
+      <svg
+        className="w-5 h-5"
+        fill="#ffffff"
+        viewBox="0 0 24 24"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path d="M19.146 4.854l-1.489 1.489A8 8 0 1 0 12 20a8.094 8.094 0 0 0 7.371-4.886 1 1 0 1 0-1.842-.779A6.071 6.071 0 0 1 12 18a6 6 0 1 1 4.243-10.243l-1.39 1.39a.5.5 0 0 0 .354.854H19.5A.5.5 0 0 0 20 9.5V5.207a.5.5 0 0 0-.854-.353z"></path>
+      </svg>
+      รีเฟรช
+    </button>
+  </div>
+</div>
+
 
       {error && <div className="text-red-400 mb-4">{error}</div>}
 

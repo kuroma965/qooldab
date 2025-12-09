@@ -1,5 +1,6 @@
 // app/(other-pages)/layout.js
-import Navbar from '@/components/common/Navbar';
+import Navbar from '@/components/layout/Navbar';
+import FooterCopyright from '@/components/layout/FooterCopyright';
 
 export default function OtherPagesLayout({ children }) {
   return (
@@ -9,6 +10,7 @@ export default function OtherPagesLayout({ children }) {
         <div className='py-[-200px]'>
           {children}
         </div>
+        <FooterCopyright />
       </main>
     </>
   );

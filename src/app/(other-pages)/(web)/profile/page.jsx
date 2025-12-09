@@ -9,7 +9,7 @@ export default async function Page() {
 
   // ส่ง session เป็น prop เริ่มต้น (จะถูก serialise)
   return (
-    <div className="min-h-screen bg-gray-950 p-8">
+    <div className=" bg-gray-950 p-8">
       <div className="max-w-3xl mx-auto">
         <ProfileUser initialSession={session ?? null} />
       </div>
