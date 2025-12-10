@@ -20,7 +20,7 @@ export const keyStatusEnum = pgEnum('key_status', [
 
 export const users = pgTable('users', {
   id: serial('id').primaryKey(),
-  email: varchar('email', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
   password_hash: text('password_hash'),
   name: varchar('name', { length: 100 }),
   role: varchar('role', { length: 50 }).notNull().default('user'),
@@ -52,6 +52,7 @@ export const products = pgTable('products', {
   category_id: integer('category_id').references(() => categories.id),
   image: text('image'),
   is_active: boolean('is_active').notNull().default(true),
+  is_limited_per_user: boolean('is_limited_per_user').notNull().default(false),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -65,7 +66,7 @@ export const orders = pgTable('orders', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const productKeys = pgTable('product_keys', {
+export const keys = pgTable('keys', {
   id: serial('id').primaryKey(),
   key: varchar('key', { length: 255 }).notNull().unique(),
   product_id: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
@@ -74,6 +75,15 @@ export const productKeys = pgTable('product_keys', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
   status: keyStatusEnum('status').notNull().default('unused'), 
+  order_id: integer('order_id').references(() => orders.id, { onDelete: 'set null' }),
+});
+
+export const productItems = pgTable('product_items', {
+  id: serial('id').primaryKey(),
+  product_id: integer('product_id').notNull().references(() => products.id, { onDelete: 'cascade' }),
+  item: varchar('item', { length: 255 }).notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  order_id: integer('order_id').references(() => orders.id, { onDelete: 'set null' }),
 });
 
 export const productFiles = pgTable('product_files', {
@@ -86,4 +96,22 @@ export const productFiles = pgTable('product_files', {
   file_size_bytes: integer('file_size_bytes'),
   file_hash: varchar('file_hash', { length: 128 }),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const coupons = pgTable('coupons', {
+  id: serial('id').primaryKey(),
+  code: varchar('code', { length: 50 }).notNull().unique(),
+  credit_amount: numeric('credit_amount', { precision: 10, scale: 2 }).notNull(),
+  usage_limit: integer('usage_limit').notNull().default(1),
+  used_count: integer('used_count').notNull().default(0),
+  expires_at: timestamp('expires_at', { withTimezone: true }),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const announcements = pgTable('announcements', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 200 }).notNull(),
+  content: text('content').notNull(),
+  created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });

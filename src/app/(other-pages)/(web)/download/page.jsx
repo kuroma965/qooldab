@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 export default function Page() {
   const router = useRouter()
   return (
-    <main className="min-h-screen flex items-center justify-center bg-black text-white px-4">
+    <main className="min-h-[calc(100vh-120px)] flex items-center justify-center bg-gray-950 text-white px-4">
       <div className="max-w-xl w-full text-center">
         <h1 className="text-3xl md:text-4xl font-extrabold mb-3">ยังไม่เปิดให้บริการ</h1>
         <div className="flex items-center justify-center gap-3 mt-4">

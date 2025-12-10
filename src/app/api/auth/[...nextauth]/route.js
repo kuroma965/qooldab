@@ -143,7 +143,7 @@ export const authOptions = {
               email,
               passwordHash: hashed,
               name: credentials.name ?? null,
-              sign_up: "qooldab",
+              sign_up: "credential",
             });
             if (!created) throw new Error("Failed to create user");
 

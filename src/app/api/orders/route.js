@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { db } from '@/db/db';
 import { users, products, orders } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { eq, and } from 'drizzle-orm'; // ✅ เพิ่ม and
 
 export async function POST(req) {
   try {
@@ -60,6 +60,42 @@ export async function POST(req) {
         { ok: false, message: 'จำนวนสินค้าในสต็อกไม่เพียงพอ' },
         { status: 400 }
       );
+    }
+
+    // 3.1 เช็กสินค้าแบบจำกัดสิทธิ์ต่อคน
+    if (product.is_limited_per_user) {
+      // เช็กว่าผู้ใช้นี้เคยซื้อสินค้านี้ไปแล้วหรือยัง
+      const [existingOrder] = await db
+        .select({ id: orders.id })
+        .from(orders)
+        .where(
+          and(
+            eq(orders.user_id, userId),
+            eq(orders.product_id, productId)
+          )
+        )
+        .limit(1);
+
+      if (existingOrder) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: 'คุณได้ใช้สิทธิ์ซื้อสินค้านี้ไปแล้ว ไม่สามารถซื้อซ้ำได้',
+          },
+          { status: 400 }
+        );
+      }
+
+      // ต้องซื้อได้แค่คนละ 1 ชิ้นเท่านั้น
+      if (quantity !== 1) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: 'สินค้านี้จำกัดสิทธิ์ให้ซื้อได้คนละ 1 ชิ้นเท่านั้น',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // 4) ราคาสินค้า

@@ -15,7 +15,7 @@ import {
   Clock,
 } from 'lucide-react';
 
-import ModalDialog from '../common/ModalDialog';
+import ModalDialog from '@/components/common/ModalDialog';
 
 export default function ProfileUser({ initialSession = null }) {
   const session = initialSession ?? null;

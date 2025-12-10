@@ -1,6 +1,6 @@
 // app/account/page.jsx
 import React from 'react';
-import ProfileUser from '@/components/web/ProfileUser';
+import ProfileUser from '@/components/web/user/ProfileUser';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 
