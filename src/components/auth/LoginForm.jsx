@@ -14,14 +14,21 @@ import {
   LogIn,
 } from 'lucide-react';
 import PageLoadingOverlay from '@/components/common/PageLoadingOverlay';
+import { Turnstile } from '@marsidev/react-turnstile';
+
+const REMEMBER_EMAIL_KEY = 'login_remember_email_v1';
 
 export default function LoginForm({ redirectTo = '/profile' }) {
   const router = useRouter();
   const params = useSearchParams();
 
+  const [cfToken, setCfToken] = useState('');
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const [rememberMe, setRememberMe] = useState(false); // ✅ checkbox จำข้อมูล
 
   const [loadingSignin, setLoadingSignin] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
@@ -33,18 +40,29 @@ export default function LoginForm({ redirectTo = '/profile' }) {
 
   // Map error keys to user-friendly messages
   const ERROR_MESSAGES = {
-    not_google: 'อีเมลนี้ไม่ได้สมัครผ่าน Google — กรุณาเข้าสู่ระบบด้วยรหัสผ่าน',
+    not_google: 'อีเมลนี้ไม่ได้สมัครผ่าน Google',
     google_no_email: 'ไม่สามารถอ่านอีเมลจาก Google ได้',
     Invalid_credentials: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง',
     INACTIVE_ACCOUNT: 'บัญชีนี้ถูกระงับการใช้งาน',
+    BOT_DETECTED: 'ระบบตรวจพบกิจกรรมที่ผิดปกติ โปรดลองใหม่อีกครั้ง',
+    MISSING_TURNSTILE_TOKEN: 'โปรดยืนยันว่าคุณไม่ใช่บอทก่อนเข้าสู่ระบบ',
   };
 
-  // ✅ เวลาเข้าหน้านี้ให้เลื่อนขึ้นบนสุด + trigger intro animation
+  // ✅ เวลาเข้าหน้านี้ให้เลื่อนขึ้นบนสุด + trigger intro animation + โหลด email ที่เคยจำไว้
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+
+      try {
+        const saved = window.localStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (saved) {
+          setEmail(saved);
+          setRememberMe(true);
+        }
+      } catch {
+        // ignore
+      }
     }
-    // delay นิดนึงให้ browser วาง layout ก่อนแล้วค่อยเล่นอนิเมะ
     const t = setTimeout(() => setMounted(true), 10);
     return () => clearTimeout(t);
   }, []);
@@ -84,6 +102,10 @@ export default function LoginForm({ redirectTo = '/profile' }) {
       setError('กรุณากรอกรหัสผ่าน');
       return;
     }
+    if (!cfToken) {
+      setError('โปรดยืนยันว่าคุณไม่ใช่บอทก่อนเข้าสู่ระบบ');
+      return;
+    }
 
     setLoadingSignin(true);
 
@@ -100,6 +122,7 @@ export default function LoginForm({ redirectTo = '/profile' }) {
         redirect: false,
         email: cleanedEmail,
         password,
+        cfToken, 
       });
 
       if (res?.error) {
@@ -110,6 +133,17 @@ export default function LoginForm({ redirectTo = '/profile' }) {
           null;
         setError(friendly || raw);
       } else {
+        // ✅ จัดการ remember email ตรงนี้
+        try {
+          if (rememberMe) {
+            window.localStorage.setItem(REMEMBER_EMAIL_KEY, cleanedEmail);
+          } else {
+            window.localStorage.removeItem(REMEMBER_EMAIL_KEY);
+          }
+        } catch {
+          // ignore
+        }
+
         // ✅ เล่น outro ก่อน แล้วค่อย redirect
         setLeaving(true);
         setTimeout(() => {
@@ -120,7 +154,6 @@ export default function LoginForm({ redirectTo = '/profile' }) {
       console.error('Login error:', err);
       setError('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
     } finally {
-      // ให้ loading ยัง true ระหว่าง outro+redirect จะได้ไม่สลับ state ไปมา
       setTimeout(() => setLoadingSignin(false), 250);
     }
   }
@@ -137,7 +170,6 @@ export default function LoginForm({ redirectTo = '/profile' }) {
         return;
       }
 
-      // ✅ outro ก่อน redirect ไป Google
       setLeaving(true);
       setTimeout(() => {
         nextAuth.signIn('google', { callbackUrl: redirectTo });
@@ -154,12 +186,11 @@ export default function LoginForm({ redirectTo = '/profile' }) {
     'block w-full rounded-xl bg-gray-900/50 border border-gray-700/50 text-white px-3 py-2.5 pl-10 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 placeholder:text-gray-500';
   const isDisabled = loadingSignin || loadingGoogle;
 
-  // ✅ คำนวณ class สำหรับ animation ของ card
   const cardStateClass = leaving
     ? 'opacity-0 translate-y-4 scale-95'
     : mounted
-    ? 'opacity-100 translate-y-0 scale-100'
-    : 'opacity-0 translate-y-4 scale-95';
+      ? 'opacity-100 translate-y-0 scale-100'
+      : 'opacity-0 translate-y-4 scale-95';
 
   return (
     <div className="relative flex items-center justify-center min-h-[600px] p-4">
@@ -170,8 +201,8 @@ export default function LoginForm({ redirectTo = '/profile' }) {
           loadingSignin
             ? 'กำลังตรวจสอบข้อมูลเข้าสู่ระบบ...'
             : loadingGoogle
-            ? 'กำลังเชื่อมต่อ Google...'
-            : 'กำลังโหลด...'
+              ? 'กำลังเชื่อมต่อ Google...'
+              : 'กำลังโหลด...'
         }
       />
 
@@ -200,8 +231,8 @@ export default function LoginForm({ redirectTo = '/profile' }) {
 
         {/* Error Alert */}
         {error && (
-          <div className="mb-6 flex items-start gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl">
-            <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400 mt-0.5" />
+          <div className="mb-6 flex items-center gap-3 px-4 py-3 bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl">
+            <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-400" />
             <span className="text-sm leading-tight">{error}</span>
           </div>
         )}
@@ -258,7 +289,20 @@ export default function LoginForm({ redirectTo = '/profile' }) {
                 )}
               </button>
             </div>
-            <div className="text-right">
+
+            {/* ✅ remember + ลืมรหัสผ่าน ในแถวเดียวกัน */}
+            <div className="flex items-center justify-between mt-2">
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  disabled={isDisabled}
+                  className="h-4 w-4 rounded border-gray-500 bg-gray-900 text-purple-500 focus:ring-purple-500"
+                />
+                <span>จดจำอีเมลเข้าสู่ระบบ</span>
+              </label>
+
               <Link
                 href="/forgot-password"
                 className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
@@ -266,15 +310,33 @@ export default function LoginForm({ redirectTo = '/profile' }) {
                 ลืมรหัสผ่าน?
               </Link>
             </div>
+
+            {/* Cloudflare Turnstile */}
+            <div className="mt-3 text-center">
+              <Turnstile
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setCfToken(token)}
+                onExpire={() => setCfToken('')}
+                onError={() => setCfToken('')}
+                options={{
+                  theme: 'dark',
+                }}
+              />
+              {!cfToken && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  โปรดยืนยันว่าคุณไม่ใช่บอท ก่อนเข้าสู่ระบบ
+                </p>
+              )}
+            </div>
+
           </div>
 
           {/* Submit Button */}
           <button
             type="submit"
             disabled={isDisabled}
-            className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-900/30 transition-all duration-200 active:scale-[0.98] ${
-              isDisabled ? 'opacity-70 cursor-not-allowed' : ''
-            }`}
+            className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-purple-900/30 transition-all duration-200 active:scale-[0.98] ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''
+              }`}
           >
             {loadingSignin ? (
               <Loader2 className="h-5 w-5 animate-spin" />
@@ -301,9 +363,8 @@ export default function LoginForm({ redirectTo = '/profile' }) {
         <button
           onClick={handleGoogleSignIn}
           disabled={isDisabled}
-          className={`w-full flex items-center justify-center gap-3 bg-white/5 border border-gray-700/50 rounded-xl px-3 py-3 text-sm font-medium text-gray-200 hover:bg-white/10 transition-all duration-200 active:scale-[0.98] ${
-            isDisabled ? 'opacity-70 cursor-not-allowed' : ''
-          }`}
+          className={`w-full flex items-center justify-center gap-3 bg-white/5 border border-gray-700/50 rounded-xl px-3 py-3 text-sm font-medium text-gray-200 hover:bg-white/10 transition-all duration-200 active:scale-[0.98] ${isDisabled ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
         >
           {loadingGoogle ? (
             <Loader2 className="h-5 w-5 animate-spin text-gray-400" />

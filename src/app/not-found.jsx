@@ -2,6 +2,8 @@
 import Link from 'next/link';
 
 export default function NotFound() {
+  const year = new Date().getFullYear();
+
   return (
     <main className="min-h-screen flex items-center justify-center bg-black text-white px-6">
       <div className="max-w-3xl w-full text-center">
@@ -22,18 +24,14 @@ export default function NotFound() {
           <Link href="/" className="inline-block px-6 py-3 bg-purple-600 hover:bg-purple-700 rounded-md font-medium shadow">
             กลับหน้าแรก
           </Link>
-
-          <Link href="/games" className="inline-block px-6 py-3 border border-gray-700 text-gray-200 rounded-md hover:bg-gray-800">
-            ดูเกมทั้งหมด
-          </Link>
         </div>
 
         <div className="mt-8 text-sm text-gray-500">
           <p>ถ้าคุณคิดว่าเป็นข้อผิดพลาด โปรด <Link href="/contact" className="text-white underline">ติดต่อเรา</Link> หรือลองค้นหาจากเมนูด้านบน</p>
         </div>
 
-        <div className="mt-10 text-xs text-gray-600/60">
-          <p>qooldab — keep calm & game on 🎮</p>
+        <div className="mt-10 text-sm text-gray-600/60">
+          <p>© {year}{' '}Qooldab. All Rights Reserved.</p>
         </div>
       </div>
     </main>

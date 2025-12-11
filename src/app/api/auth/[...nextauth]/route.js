@@ -105,12 +105,42 @@ export const authOptions = {
         password: { label: "Password", type: "password" },
         name: { label: "Name", type: "text" }, // optional for signup
         action: { label: "action", type: "text" }, // 'signup' or undefined
+        cfToken: { label: "cfToken", type: "text" }, // 👈 จาก Cloudflare Turnstile
       },
       /**
        * authorize runs for both login and signup (depending on credentials.action)
        */
       async authorize(credentials) {
         try {
+          // 0) ตรวจ Turnstile ก่อนทุกอย่าง
+          const cfToken = credentials?.cfToken;
+
+          if (!cfToken) {
+            // ไม่มี token = ยังไม่ยืนยันจาก Cloudflare
+            throw new Error("MISSING_TURNSTILE_TOKEN");
+          }
+
+          const verifyRes = await fetch(
+            "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({
+                secret: process.env.TURNSTILE_SECRET_KEY,
+                response: cfToken,
+                // ถ้าอยากส่ง IP ไปด้วย: remoteip: req.ip (ใน app router ต้องหาวิธีดึงเอง)
+              }),
+            }
+          );
+
+          const verifyData = await verifyRes.json();
+
+          if (!verifyData.success) {
+            console.error("Turnstile failed", verifyData);
+            throw new Error("BOT_DETECTED");
+          }
+
+          // 1) ผ่าน Turnstile แล้ว ค่อยทำ auth ตามปกติ
           if (!credentials?.email) return null;
           const email = String(credentials.email).trim().toLowerCase();
 
@@ -128,22 +158,27 @@ export const authOptions = {
           const existing = rows[0];
 
           if (isSignup) {
-            // signup flow
+            // ===== signup flow =====
             if (existing) {
               throw new Error("Email already in use");
             }
-            if (!credentials?.password || String(credentials.password).length < 8) {
+            if (
+              !credentials?.password ||
+              String(credentials.password).length < 8
+            ) {
               throw new Error("Password required (min 8 chars)");
             }
+
             const hashed = await bcrypt.hash(
               String(credentials.password),
               BCRYPT_ROUNDS
             );
+
             const created = await createUser({
               email,
               passwordHash: hashed,
               name: credentials.name ?? null,
-              sign_up: "credential",
+              sign_up: "credentials",
             });
             if (!created) throw new Error("Failed to create user");
 
@@ -156,26 +191,24 @@ export const authOptions = {
               updated_at: created.updated_at
                 ? new Date(created.updated_at).toISOString()
                 : undefined,
-              credits: formatCreditsRaw(created.credits), // <- add credits
+              credits: formatCreditsRaw(created.credits),
             };
           } else {
-            // login flow
+            // ===== login flow =====
             if (!existing) {
               throw new Error("Invalid_credentials");
             }
 
-            // NEW: ถ้า user ถูกปิดการใช้งาน ไม่ให้ล็อกอิน
+            // ถ้าบัญชีถูกปิดการใช้งาน
             if (existing.is_active === false) {
-              // ข้อความนี้จะถูกส่งไปที่ /login?error=INACTIVE_ACCOUNT (ถ้า config หน้า error รับได้)
               throw new Error("INACTIVE_ACCOUNT");
             }
 
-            // If this account was created via Google, tell the user to use Google sign-in
+            // ถ้าสมัครด้วย Google ห้ามใช้ password login
             if (
               existing.sign_up &&
               String(existing.sign_up).toLowerCase() === "google"
             ) {
-              // throw with friendly message (NextAuth will send it to pages.error if configured)
               throw new Error(
                 "อีเมลนี้สมัครผ่าน Google กรุณาเข้าสู่ระบบด้วย Google"
               );
@@ -184,6 +217,7 @@ export const authOptions = {
             if (!credentials?.password) {
               throw new Error("Password required");
             }
+
             const ok = await bcrypt.compare(
               String(credentials.password),
               existing.password_hash
@@ -199,14 +233,14 @@ export const authOptions = {
               updated_at: existing.updated_at
                 ? new Date(existing.updated_at).toISOString()
                 : undefined,
-              credits: formatCreditsRaw(existing.credits), // <- add credits
+              credits: formatCreditsRaw(existing.credits),
             };
           }
         } catch (err) {
           console.error("Credentials authorize error:", err?.message ?? err);
           throw err;
         }
-      },
+      }
     }),
 
     GoogleProvider({

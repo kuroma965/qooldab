@@ -1,8 +1,7 @@
-// app/api/admin/products/route.js
 import { NextResponse } from 'next/server';
 import { db } from '@/db/db';
 import { products, categories } from '@/db/schema';
-import { eq } from 'drizzle-orm'; // 🆕 เพิ่มอันนี้
+import { and, eq, ilike } from 'drizzle-orm';
 
 export async function GET(req) {
   try {
@@ -10,69 +9,61 @@ export async function GET(req) {
     const q = (url.searchParams.get('q') || '').trim();
     const qLower = q.toLowerCase();
 
-    // 🆕 ดึงเฉพาะสินค้าที่ is_active = true
-    const allProducts = await db
-      .select()
-      .from(products)
-      .where(eq(products.is_active, true));
+    // base condition: เฉพาะ is_active = true
+    let whereCond = eq(products.is_active, true);
 
-    // ดึงหมวดหมู่ทั้งหมด เพื่อ map id/slug/name -> category_name
-    const allCategories = await db.select().from(categories);
-
-    const catByIdName = new Map();
-    const catBySlugName = new Map();
-    const catByNameName = new Map();
-
-    allCategories.forEach((c) => {
-      const idKey = c.id != null ? String(c.id) : null;
-      const slugKey = c.slug != null ? String(c.slug).toLowerCase() : null;
-      const nameKey = c.name != null ? String(c.name).toLowerCase() : null;
-      if (idKey) catByIdName.set(idKey, c.name);
-      if (slugKey) catBySlugName.set(slugKey, c.name);
-      if (nameKey) catByNameName.set(nameKey, c.name);
-    });
-
-    const itemsWithCategory = allProducts.map((p) => {
-      let categoryName = null;
-
-      if (p.category_id != null) {
-        categoryName = catByIdName.get(String(p.category_id)) ?? null;
-      }
-
-      return {
-        ...p,
-        category_name: categoryName,
-      };
-    });
+    let categoryIdFilter = null;
 
     if (q) {
-      const matchedCatIds = new Set(
-        allCategories
-          .filter((c) => {
-            if (c.id != null && String(c.id) === q) return true;
-            if (c.slug && String(c.slug).toLowerCase() === qLower) return true;
-            if (c.name && String(c.name).toLowerCase() === qLower) return true;
-            return false;
-          })
-          .map((c) => String(c.id))
-      );
+      // ลองแมตช์ category ก่อน
+      const cat = await db
+        .select()
+        .from(categories)
+        .where(
+          or(
+            eq(categories.slug, qLower),
+            eq(categories.name, q),
+            eq(categories.id, Number.isFinite(Number(q)) ? Number(q) : -1)
+          )
+        )
+        .limit(1);
 
-      const filtered = itemsWithCategory.filter((p) => {
-        if (matchedCatIds.size > 0) {
-          return (
-            p.category_id != null &&
-            matchedCatIds.has(String(p.category_id))
-          );
-        }
-
-        if (String(p.id) === q) return true;
-        if (p.name && p.name.toLowerCase().includes(qLower)) return true;
-
-        return false;
-      });
-
-      return NextResponse.json({ items: filtered }, { status: 200 });
+      if (cat[0]) {
+        categoryIdFilter = cat[0].id;
+      }
     }
+
+    // ถ้าเจอหมวดจาก q → filter ด้วย category_id
+    if (categoryIdFilter != null) {
+      whereCond = and(whereCond, eq(products.category_id, categoryIdFilter));
+    } else if (q) {
+      // ถ้าไม่ใช่หมวด ลองใช้ id / ชื่อสินค้าแทน
+      const asNumber = Number(q);
+      if (Number.isFinite(asNumber)) {
+        whereCond = and(whereCond, eq(products.id, asNumber));
+      } else {
+        whereCond = and(whereCond, ilike(products.name, `%${q}%`));
+      }
+    }
+
+    const rows = await db
+      .select()
+      .from(products)
+      .where(whereCond);
+
+    // ดึง category แค่สำหรับที่จำเป็น (หรือจะดึงทั้งหมดเหมือนเดิมก็ได้)
+    const allCategories = await db.select().from(categories);
+    const catByIdName = new Map(
+      allCategories.map((c) => [String(c.id), c.name])
+    );
+
+    const itemsWithCategory = rows.map((p) => ({
+      ...p,
+      category_name:
+        p.category_id != null
+          ? catByIdName.get(String(p.category_id)) ?? null
+          : null,
+    }));
 
     return NextResponse.json({ items: itemsWithCategory }, { status: 200 });
   } catch (err) {

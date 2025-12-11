@@ -3,8 +3,14 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import { db } from '@/db/db';
-import { users, products, orders } from '@/db/schema';
-import { eq, and } from 'drizzle-orm'; // ✅ เพิ่ม and
+import {
+  users,
+  products,
+  orders,
+  keys,
+  productItems,
+} from '@/db/schema';
+import { eq, and, isNull, inArray } from 'drizzle-orm';
 
 export async function POST(req) {
   try {
@@ -62,9 +68,8 @@ export async function POST(req) {
       );
     }
 
-    // 3.1 เช็กสินค้าแบบจำกัดสิทธิ์ต่อคน
+    // 3.1 สินค้าแบบจำกัดสิทธิ์
     if (product.is_limited_per_user) {
-      // เช็กว่าผู้ใช้นี้เคยซื้อสินค้านี้ไปแล้วหรือยัง
       const [existingOrder] = await db
         .select({ id: orders.id })
         .from(orders)
@@ -86,7 +91,6 @@ export async function POST(req) {
         );
       }
 
-      // ต้องซื้อได้แค่คนละ 1 ชิ้นเท่านั้น
       if (quantity !== 1) {
         return NextResponse.json(
           {
@@ -102,7 +106,6 @@ export async function POST(req) {
     const unitPrice = Number(product.price ?? 0);
     const totalPrice = unitPrice * quantity;
 
-    // อนุญาตให้ราคา 0 ได้ (ของฟรี) แต่ห้ามติดลบ/NaN
     if (!Number.isFinite(totalPrice) || totalPrice < 0) {
       return NextResponse.json(
         { ok: false, message: 'ราคาสินค้าไม่ถูกต้อง' },
@@ -138,12 +141,94 @@ export async function POST(req) {
       );
     }
 
+    // 6) ก่อนตัดเงิน / สร้าง order → เช็ก key / item ว่าพอไหม
+    let assignedKeys = [];
+    let assignedItems = [];
+    let mode = null; // 'keys' หรือ 'items'
+
+    // 6.1 ลองใช้ keys ก่อน
+    const availableKeys = await db
+      .select()
+      .from(keys)
+      .where(
+        and(
+          eq(keys.product_id, productId),
+          isNull(keys.order_id),
+        )
+      )
+      .limit(quantity);
+
+    let keyIdsToAssign = [];
+    let itemIdsToAssign = [];
+
+    if (availableKeys.length >= quantity) {
+      mode = 'keys';
+      keyIdsToAssign = availableKeys
+        .slice(0, quantity)
+        .map((k) => k.id);
+    } else if (availableKeys.length === 0) {
+      // ไม่มี key ว่างเลย → ใช้ product_items แทน
+      const availableItems = await db
+        .select()
+        .from(productItems)
+        .where(
+          and(
+            eq(productItems.product_id, productId),
+            isNull(productItems.order_id)
+          )
+        )
+        .limit(quantity);
+
+      if (availableItems.length >= quantity) {
+        mode = 'items';
+        itemIdsToAssign = availableItems
+          .slice(0, quantity)
+          .map((i) => i.id);
+      } else {
+        // ทั้ง keys และ product_items ไม่มีพอ → แจ้ง error
+        console.error(
+          'not enough product_items for order',
+          'need',
+          quantity,
+          'have',
+          availableItems.length
+        );
+        return NextResponse.json(
+          {
+            ok: false,
+            message:
+              'จำนวน key / item สำหรับสินค้านี้ไม่เพียงพอ กรุณาติดต่อผู้ดูแลระบบ',
+          },
+          { status: 500 }
+        );
+      }
+    } else {
+      // มี keys บ้างแต่ไม่ครบ quantity → ไม่ยอมให้ผ่าน
+      console.error(
+        'not enough keys for order',
+        'need',
+        quantity,
+        'have',
+        availableKeys.length
+      );
+      return NextResponse.json(
+        {
+          ok: false,
+          message:
+            'จำนวน key สำหรับสินค้านี้ไม่เพียงพอ กรุณาติดต่อผู้ดูแลระบบ',
+        },
+        { status: 500 }
+      );
+    }
+
+    // ถึงตรงนี้ = mode ต้องเป็น 'keys' หรือ 'items' แน่นอน แล้วมี id ที่จะใช้ครบตาม quantity แล้ว
+
     const newCredits =
       totalPrice > 0 ? currentCredits - totalPrice : currentCredits;
 
-    // 6) ⚠️ ไม่มี transaction ใช้แบบทีละคำสั่งแทน ⚠️
+    // 7) ไม่มี transaction → ทำทีละคำสั่ง
 
-    // 6.1 อัปเดตเครดิต (เฉพาะกรณีต้องตัดเงิน)
+    // 7.1 อัปเดตเครดิต
     if (totalPrice > 0) {
       await db
         .update(users)
@@ -151,7 +236,7 @@ export async function POST(req) {
         .where(eq(users.id, userId));
     }
 
-    // 6.2 อัปเดต stock / sold
+    // 7.2 อัปเดต stock / sold
     await db
       .update(products)
       .set({
@@ -161,7 +246,7 @@ export async function POST(req) {
       })
       .where(eq(products.id, productId));
 
-    // 6.3 สร้างใบสั่งซื้อ (orders)
+    // 7.3 สร้าง order
     const [inserted] = await db
       .insert(orders)
       .values({
@@ -169,11 +254,34 @@ export async function POST(req) {
         product_id: productId,
         quantity,
         total_price: totalPrice,
-        // created_at ใช้ defaultNow() จาก schema
       })
       .returning();
 
-    // 7) response
+    const orderId = inserted.id;
+
+    // 7.4 ผูก key หรือ item ตาม mode ที่เลือกไว้
+    if (mode === 'keys' && keyIdsToAssign.length > 0) {
+      await db
+        .update(keys)
+        .set({
+          order_id: orderId,
+          status: 'unused', // ใส่ค่าเดิมตามที่คุณใช้ ไม่ไปยุ่ง logic อื่น
+        })
+        .where(inArray(keys.id, keyIdsToAssign));
+
+      assignedKeys = keyIdsToAssign;
+    } else if (mode === 'items' && itemIdsToAssign.length > 0) {
+      await db
+        .update(productItems)
+        .set({
+          order_id: orderId,
+        })
+        .where(inArray(productItems.id, itemIdsToAssign));
+
+      assignedItems = itemIdsToAssign;
+    }
+
+    // 8) response
     return NextResponse.json({
       ok: true,
       message: 'ทำรายการสำเร็จ',
