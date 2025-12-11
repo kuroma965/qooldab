@@ -15,6 +15,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import PageLoadingOverlay from '@/components/common/PageLoadingOverlay';
+import { Turnstile } from '@marsidev/react-turnstile';
 
 export default function SignupForm({
   redirectTo = '/profile',
@@ -26,6 +27,8 @@ export default function SignupForm({
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPw, setConfirmPw] = useState('');
+
+  const [cfToken, setCfToken] = useState('');
 
   // ใช้ตัวเดียวคุมทั้ง 2 ช่อง
   const [showPassword, setShowPassword] = useState(false);
@@ -66,6 +69,9 @@ export default function SignupForm({
       return setError('รหัสผ่านต้องยาวอย่างน้อย 8 ตัวอักษร');
     if (password !== confirmPw)
       return setError('รหัสผ่านกับการยืนยันไม่ตรงกัน');
+    if (!cfToken) {
+     return setError('โปรดยืนยันว่าคุณไม่ใช่บอท ก่อนสมัครสมาชิก');
+   }
 
     setLoadingSignup(true);
 
@@ -82,6 +88,7 @@ export default function SignupForm({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
+        cfToken,
       });
 
       if (signRes?.error) {
@@ -294,13 +301,31 @@ export default function SignupForm({
                 )}
               </button>
             </div>
+
+            {/* Cloudflare Turnstile */}
+            <div className="mt-3 text-center">
+              <Turnstile
+                siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY}
+                onSuccess={(token) => setCfToken(token)}
+                onExpire={() => setCfToken('')}
+                onError={() => setCfToken('')}
+                options={{
+                  theme: 'dark',
+                }}
+              />
+              {!cfToken && (
+                <p className="mt-1 text-[11px] text-gray-500">
+                  โปรดยืนยันว่าคุณไม่ใช่บอท ก่อนเข้าสู่ระบบ
+                </p>
+              )}
+            </div>
           </div>
 
           {/* ปุ่มสมัคร */}
           <button
             type="submit"
             disabled={isDisabled}
-            className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-purple-900/30 transition-all duration-200 active:scale-[0.98] ${
+            className={`w-full flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-purple-900/30 transition-all duration-200 active:scale-[0.98] ${
               isDisabled ? 'opacity-70 cursor-not-allowed' : ''
             }`}
             aria-busy={loadingSignup}

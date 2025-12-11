@@ -8,9 +8,11 @@ import { createOrder } from '@/lib/Orders-Db';
 import { Minus, Plus } from 'lucide-react';
 import ModalDialog from '@/components/common/ModalDialog';
 import PageLoadingOverlay from '@/components/common/PageLoadingOverlay';
+import { useSession } from 'next-auth/react';
 
 
 const ProductDetailPage = ({ slug }) => {
+  const { update } = useSession();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -104,6 +106,9 @@ const ProductDetailPage = ({ slug }) => {
         quantity: qty,
       });
 
+      // ✅ สั่งซื้อสำเร็จ → ให้ next-auth ดึง session ใหม่จาก DB (เครดิตจะอัปเดต)
+      await update();
+
       setProduct((prev) =>
         prev
           ? {
@@ -178,7 +183,7 @@ const ProductDetailPage = ({ slug }) => {
         open={buying}
         label="กำลังทำรายการซื้อของคุณ..."
       />
-      
+
       {/* Background Decor */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[-10%] right-[-5%] w-[500px] h-[500px] bg-purple-900/10 rounded-full blur-[100px]" />

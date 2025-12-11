@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "is_limited_per_user" boolean DEFAULT false NOT NULL;

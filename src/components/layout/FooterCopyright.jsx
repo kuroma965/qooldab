@@ -12,7 +12,7 @@ export default function FooterCopyright() {
         <div className="flex flex-col items-center justify-center gap-1 text-center">
           <p className="text-xs sm:text-sm text-gray-400">
             © {year}{' '}
-            <span className="font-semibold text-gray-200">Qooldab</span>{' '}
+            <span className="font-semibold text-gray-200">Qooldab.</span>{' '}
             <span className="text-gray-500">
               All Rights Reserved.
             </span>
@@ -21,7 +21,7 @@ export default function FooterCopyright() {
           <p className="text-[11px] sm:text-xs text-gray-500">
             Powered by{' '}
             <span className="text-purple-300">
-              reqiler dev
+              reqilerDev
             </span>
           </p>
         </div>

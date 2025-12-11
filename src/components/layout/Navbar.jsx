@@ -18,6 +18,7 @@ import {
   UserPlus,
   ShoppingBag,
   Clock3,
+  Coins, // 🆕 เติมเครดิต icon
 } from 'lucide-react';
 
 export default function Navbar() {
@@ -43,6 +44,7 @@ export default function Navbar() {
     return () => document.removeEventListener('mousedown', onDocClick);
   }, []);
 
+  // เปลี่ยนหน้าแล้วปิดเมนูมือถือ
   useEffect(() => {
     setIsMenuOpen(false);
   }, [pathname]);
@@ -240,6 +242,16 @@ export default function Navbar() {
                         <Clock3 className="w-4 h-4" />
                         <span>ประวัติการสั่งซื้อ</span>
                       </Link>
+
+                      {/* 🆕 เติมเครดิต (desktop dropdown) */}
+                      <Link
+                        href="/profile/topup"
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Coins className="w-4 h-4" />
+                        <span>เติมเครดิต</span>
+                      </Link>
+
                       <button
                         onClick={logout}
                         className="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
@@ -278,96 +290,109 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {isMenuOpen && (
-        <div className="md:hidden bg-black bg-opacity-95">
-          <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-            <Link
-              href="/"
-              className={`${mobileLinkBase} text-white hover:bg-purple-800`}
-            >
-              <Home className="w-5 h-5" />
-              <span>หน้าหลัก</span>
-            </Link>
-            <Link
-              href="/products"
-              className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
-            >
-              <ShoppingBag className="w-5 h-5" />
-              <span>สินค้าทั้งหมด</span>
-            </Link>
-            <Link
-              href="/categories"
-              className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
-            >
-              <Grid2X2 className="w-5 h-5" />
-              <span>หมวดหมู่</span>
-            </Link>
-            <Link
-              href="/download"
-              className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
-            >
-              <Download className="w-5 h-5" />
-              <span>ดาวน์โหลด</span>
-            </Link>
+      {/* Mobile menu with animation */}
+      <div
+        className={`
+          md:hidden bg-black bg-opacity-95 overflow-hidden transform origin-top transition-all duration-200
+          ${isMenuOpen ? 'max-h-[500px] opacity-100 scale-y-100' : 'max-h-0 opacity-0 scale-y-95 pointer-events-none'}
+        `}
+      >
+        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+          <Link
+            href="/"
+            className={`${mobileLinkBase} text-white hover:bg-purple-800`}
+          >
+            <Home className="w-5 h-5" />
+            <span>หน้าหลัก</span>
+          </Link>
+          <Link
+            href="/products"
+            className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+          >
+            <ShoppingBag className="w-5 h-5" />
+            <span>สินค้าทั้งหมด</span>
+          </Link>
+          <Link
+            href="/categories"
+            className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+          >
+            <Grid2X2 className="w-5 h-5" />
+            <span>หมวดหมู่</span>
+          </Link>
+          <Link
+            href="/download"
+            className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+          >
+            <Download className="w-5 h-5" />
+            <span>ดาวน์โหลด</span>
+          </Link>
 
-            {isAdmin && (
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={`${mobileLinkBase} bg-red-600 text-white hover:opacity-90`}
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span>Admin Panel</span>
+            </Link>
+          )}
+
+          {!isAuthenticated && !isLoading && (
+            <>
               <Link
-                href="/admin"
-                className={`${mobileLinkBase} bg-red-600 text-white hover:opacity-90`}
+                href="/signup"
+                className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
               >
-                <LayoutDashboard className="w-5 h-5" />
-                <span>Admin Panel</span>
+                <UserPlus className="w-5 h-5" />
+                <span>สมัครสมาชิก</span>
               </Link>
-            )}
+              <Link
+                href="/login"
+                className="block w-full text-left px-3 py-2 rounded-md text-base font-medium bg-purple-600 text-white hover:opacity-90 flex items-center gap-2"
+              >
+                <LogIn className="w-5 h-5" />
+                <span>เข้าสู่ระบบ</span>
+              </Link>
+            </>
+          )}
 
-            {!isAuthenticated && !isLoading && (
-              <>
-                <Link
-                  href="/signup"
-                  className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
-                >
-                  <UserPlus className="w-5 h-5" />
-                  <span>สมัครสมาชิก</span>
-                </Link>
-                <Link
-                  href="/login"
-                  className="block w-full text-left px-3 py-2 rounded-md text-base font-medium bg-purple-600 text-white hover:opacity-90 flex items-center gap-2"
-                >
-                  <LogIn className="w-5 h-5" />
-                  <span>เข้าสู่ระบบ</span>
-                </Link>
-              </>
-            )}
+          {isAuthenticated && (
+            <>
+              <Link
+                href="/profile"
+                className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+              >
+                <User2 className="w-5 h-5" />
+                <span>บัญชีของฉัน</span>
+              </Link>
+              <Link
+                href="/profile/history"
+                className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+              >
+                <Clock3 className="w-5 h-5" />
+                <span>ประวัติการสั่งซื้อ</span>
+              </Link>
 
-            {isAuthenticated && (
-              <>
-                <Link
-                  href="/profile"
-                  className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text:white`}
-                >
-                  <User2 className="w-5 h-5" />
-                  <span>บัญชีของฉัน</span>
-                </Link>
-                <Link
-                  href="/profile/history"
-                  className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
-                >
-                  <Clock3 className="w-5 h-5" />
-                  <span>ประวัติการสั่งซื้อ</span>
-                </Link>
-                <button
-                  onClick={logout}
-                  className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-purple-800 hover:text-white flex items-center gap-2"
-                >
-                  <X className="w-5 h-5" />
-                  <span>ออกจากระบบ</span>
-                </button>
-              </>
-            )}
-          </div>
+              {/* 🆕 เติมเครดิตในเมนูมือถือ */}
+              <Link
+                href="/profile/topup"
+                className={`${mobileLinkBase} text-gray-300 hover:bg-purple-800 hover:text-white`}
+              >
+                <Coins className="w-5 h-5" />
+                <span>เติมเครดิต</span>
+              </Link>
+
+              <button
+                onClick={logout}
+                className="w-full text-left px-3 py-2 rounded-md text-base font-medium text-red-500 hover:bg-purple-800 hover:text-white flex items-center gap-2"
+              >
+                <X className="w-5 h-5" />
+                <span>ออกจากระบบ</span>
+              </button>
+            </>
+          )}
         </div>
-      )}
+      </div>
     </nav>
   );
 }
